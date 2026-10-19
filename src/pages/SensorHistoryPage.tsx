@@ -107,7 +107,7 @@ export function SensorHistoryPage() {
           <div className="space-y-6">
             <SensorChart
               title="Soil moisture history"
-              isDemo={isDemoData}
+              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
               data={chartData}
               xKey="label"
               unit="%"
@@ -115,7 +115,7 @@ export function SensorHistoryPage() {
             />
             <SensorChart
               title="Temperature history"
-              isDemo={isDemoData}
+              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
               data={chartData}
               xKey="label"
               unit="°"
@@ -123,7 +123,7 @@ export function SensorHistoryPage() {
             />
             <SensorChart
               title="Humidity history"
-              isDemo={isDemoData}
+              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
               data={chartData}
               xKey="label"
               unit="%"
@@ -131,7 +131,7 @@ export function SensorHistoryPage() {
             />
             <SensorChart
               title="Light intensity history"
-              isDemo={isDemoData}
+              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
               data={chartData}
               xKey="label"
               unit="lx"

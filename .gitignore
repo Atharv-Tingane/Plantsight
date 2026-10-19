@@ -21,3 +21,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.*
+backend/.env
+backend/.env.*
+backend/uploads/*
+!backend/uploads/.gitkeep

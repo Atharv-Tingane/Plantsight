@@ -90,8 +90,8 @@ export function SensorChart({
           <Tooltip
             contentStyle={tooltipStyle}
             labelStyle={{ color: '#6b7280', fontWeight: 500 }}
-            formatter={(value: number, name: string) => [
-              `${value}${unit ?? ''}`,
+            formatter={(value: any, name: any) => [
+              `${value ?? ''}${unit ?? ''}`,
               name,
             ]}
           />

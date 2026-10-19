@@ -41,9 +41,10 @@ interface DataContextValue {
   latestReadings: Record<string, SensorReading | undefined>;
   allReadings: SensorReading[];
 
-  // Actions
   refresh: () => Promise<void>;
   addPlant: (plant: Omit<Plant, 'id' | 'addedAt' | 'healthStatus' | 'healthScore'>) => Promise<Plant>;
+  updatePlant: (id: string, payload: Partial<Plant>) => Promise<Plant>;
+  deletePlant: (id: string) => Promise<void>;
   acknowledgeAlert: (id: string) => Promise<void>;
   runAnalysis: (plantId: string, image: string, plantName: string) => Promise<AnalysisResult>;
   updateProfile: (p: Partial<UserProfile>) => Promise<void>;
@@ -127,6 +128,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const created = await plantsService.create(payload);
       setPlants((prev) => [created, ...prev]);
       return created;
+    },
+    [isDemoData]
+  );
+
+  const updatePlant = useCallback<DataContextValue['updatePlant']>(
+    async (id, payload) => {
+      if (isDemoData) {
+        let updated: Plant | undefined;
+        setPlants((prev) =>
+          prev.map((p) => {
+            if (p.id === id) {
+              updated = { ...p, ...payload };
+              return updated;
+            }
+            return p;
+          })
+        );
+        return updated!;
+      }
+      const updated = await plantsService.update(id, payload);
+      setPlants((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return updated;
+    },
+    [isDemoData]
+  );
+
+  const deletePlant = useCallback<DataContextValue['deletePlant']>(
+    async (id) => {
+      if (isDemoData) {
+        setPlants((prev) => prev.filter((p) => p.id !== id));
+        return;
+      }
+      await plantsService.remove(id);
+      setPlants((prev) => prev.filter((p) => p.id !== id));
+      setAllReadings((prev) => prev.filter((r) => r.plantId !== id));
+      setAlerts((prev) => prev.filter((a) => a.plantId !== id));
+      setAnalyses((prev) => prev.filter((an) => an.plantId !== id));
     },
     [isDemoData]
   );
@@ -249,6 +287,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     allReadings,
     refresh,
     addPlant,
+    updatePlant,
+    deletePlant,
     acknowledgeAlert,
     runAnalysis,
     updateProfile,

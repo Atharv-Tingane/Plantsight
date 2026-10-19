@@ -13,8 +13,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   X,
+  Trash2,
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { useData } from '@/context/DataContext';
+import { galleryService } from '@/services/api';
 import { SensorCard } from '@/components/SensorCard';
 import { SensorChart } from '@/components/SensorChart';
 import { PageHeader } from '@/components/PageHeader';
@@ -26,11 +29,21 @@ import { fileToDataUrl } from '@/lib/format';
 export function PlantDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { plants, getReadingsForPlant, latestReadings, analyses, isDemoData, loading } = useData();
+  const { plants, getReadingsForPlant, latestReadings, analyses, isDemoData, loading, deletePlant } = useData();
   const [gallery, setGallery] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const plant = plants.find((p) => p.id === id);
+
+  useEffect(() => {
+    if (plant && !isDemoData) {
+      galleryService
+        .list(plant.id)
+        .then((items) => setGallery(items.map((i) => i.url)))
+        .catch(() => {});
+    }
+  }, [plant, isDemoData]);
 
   if (loading && plants.length === 0) return <LoadingState label="Loading plant…" />;
 
@@ -60,9 +73,28 @@ export function PlantDetailsPage() {
     setUploading(true);
     try {
       const url = await fileToDataUrl(file);
-      setGallery((prev) => [url, ...prev]);
+      if (!isDemoData && plant) {
+        const item = await galleryService.upload(plant.id, url);
+        setGallery((prev) => [item.url, ...prev]);
+      } else {
+        setGallery((prev) => [url, ...prev]);
+      }
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!plant) return;
+    const confirmed = window.confirm(`Are you sure you want to delete ${plant.name}? This action cannot be undone.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await deletePlant(plant.id);
+      navigate('/plants');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete plant');
+      setDeleting(false);
     }
   }
 
@@ -79,9 +111,19 @@ export function PlantDetailsPage() {
         title={plant.name}
         subtitle={plant.species}
         action={
-          <Link to={`/analysis?plantId=${plant.id}`} className="btn-primary">
-            <ScanLine className="w-4 h-4" /> Run AI analysis
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to={`/analysis?plantId=${plant.id}`} className="btn-primary">
+              <ScanLine className="w-4 h-4" /> Run AI analysis
+            </Link>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="btn-ghost text-danger-600 hover:bg-danger-50 hover:text-danger-700 transition"
+              title="Delete plant"
+            >
+              <Trash2 className="w-4 h-4" /> {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
         }
       />
 
@@ -119,10 +161,10 @@ export function PlantDetailsPage() {
       <h3 className="font-semibold text-gray-800 mb-3">Latest environmental readings</h3>
       {latest ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <SensorCard label="Soil moisture" value={latest.soilMoisture} unit="%" icon={Droplets} accent="blue" isDemo={isDemoData} />
-          <SensorCard label="Temperature" value={latest.temperature} unit="°C" icon={Thermometer} accent="warning" isDemo={isDemoData} />
-          <SensorCard label="Humidity" value={latest.humidity} unit="%" icon={Gauge} accent="accent" isDemo={isDemoData} />
-          <SensorCard label="Light" value={latest.lightIntensity} unit="lux" icon={Sun} accent="brand" isDemo={isDemoData} />
+          <SensorCard label="Soil moisture" value={latest.soilMoisture} unit="%" icon={Droplets} accent="blue" isDemo={isDemoData || Boolean(latest.isSimulated)} />
+          <SensorCard label="Temperature" value={latest.temperature} unit="°C" icon={Thermometer} accent="warning" isDemo={isDemoData || Boolean(latest.isSimulated)} />
+          <SensorCard label="Humidity" value={latest.humidity} unit="%" icon={Gauge} accent="accent" isDemo={isDemoData || Boolean(latest.isSimulated)} />
+          <SensorCard label="Light" value={latest.lightIntensity} unit="lux" icon={Sun} accent="brand" isDemo={isDemoData || Boolean(latest.isSimulated)} />
         </div>
       ) : (
         <div className="card mb-6">
@@ -134,7 +176,7 @@ export function PlantDetailsPage() {
       <div className="grid lg:grid-cols-2 gap-6 mb-6">
         <SensorChart
           title="Soil moisture & humidity history"
-          isDemo={isDemoData}
+          isDemo={isDemoData || readings.some((r) => r.isSimulated)}
           data={chartData}
           xKey="label"
           height={220}
@@ -145,7 +187,7 @@ export function PlantDetailsPage() {
         />
         <SensorChart
           title="Temperature & light history"
-          isDemo={isDemoData}
+          isDemo={isDemoData || readings.some((r) => r.isSimulated)}
           data={chartData}
           xKey="label"
           height={220}

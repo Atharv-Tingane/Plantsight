@@ -22,6 +22,8 @@ export interface SensorReading {
   temperature: number; // °C
   humidity: number; // %
   lightIntensity: number; // lux
+  isSimulated?: boolean;
+  source?: 'esp32' | 'simulated' | 'api';
 }
 
 export type AlertSeverity = 'low' | 'medium' | 'high';

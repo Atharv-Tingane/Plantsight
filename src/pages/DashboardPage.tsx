@@ -39,8 +39,8 @@ export function DashboardPage() {
   const latestOverall = latestSorted[0];
   const previous = latestSorted[1];
 
-  const delta = (key: keyof typeof latestOverall) =>
-    latestOverall && previous ? Number((latestOverall[key] - previous[key]).toFixed(1)) : undefined;
+  const delta = (key: 'soilMoisture' | 'temperature' | 'humidity' | 'lightIntensity') =>
+    latestOverall && previous ? Number((Number(latestOverall[key]) - Number(previous[key])).toFixed(1)) : undefined;
 
   const unackAlerts = alerts.filter((a) => !a.acknowledged).slice(0, 4);
   const recentImages = plants.slice(0, 4);
@@ -73,7 +73,7 @@ export function DashboardPage() {
           icon={Droplets}
           accent="blue"
           trend={delta('soilMoisture')}
-          isDemo={isDemoData}
+          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
           sublabel="Average across plants"
         />
         <SensorCard
@@ -83,7 +83,7 @@ export function DashboardPage() {
           icon={Thermometer}
           accent="warning"
           trend={delta('temperature')}
-          isDemo={isDemoData}
+          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
           sublabel="Ambient"
         />
         <SensorCard
@@ -93,7 +93,7 @@ export function DashboardPage() {
           icon={Gauge}
           accent="accent"
           trend={delta('humidity')}
-          isDemo={isDemoData}
+          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
           sublabel="Ambient"
         />
         <SensorCard
@@ -103,7 +103,7 @@ export function DashboardPage() {
           icon={Sun}
           accent="brand"
           trend={delta('lightIntensity')}
-          isDemo={isDemoData}
+          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
           sublabel="Current"
         />
       </div>
@@ -113,7 +113,7 @@ export function DashboardPage() {
         <div className="lg:col-span-2 space-y-6">
           <SensorChart
             title={`Sensor history · ${plants[0]?.name ?? ''}`}
-            isDemo={isDemoData}
+            isDemo={isDemoData || allReadings.some((r) => r.isSimulated)}
             data={chartData}
             xKey="label"
             height={260}
@@ -124,7 +124,7 @@ export function DashboardPage() {
           />
           <SensorChart
             title="Temperature trend"
-            isDemo={isDemoData}
+            isDemo={isDemoData || allReadings.some((r) => r.isSimulated)}
             data={chartData}
             xKey="label"
             height={220}
