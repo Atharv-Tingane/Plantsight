@@ -5,10 +5,12 @@ import { evaluateReadingAlerts } from '../services/alertService.js';
 // GET /sensors/latest
 export async function getLatestReadings(req, res, next) {
   try {
-    const { plantId } = req.query;
+    const { plantId, includeSimulated } = req.query;
+    const isSim = includeSimulated === 'true';
+    const filter = isSim ? {} : { isSimulated: { $ne: true }, source: { $ne: 'simulated' } };
 
     if (plantId) {
-      const latest = await SensorReading.findOne({ plantId }).sort({ timestamp: -1 });
+      const latest = await SensorReading.findOne({ plantId, ...filter }).sort({ timestamp: -1 });
       return res.json(latest ? [latest] : []);
     }
 
@@ -17,7 +19,7 @@ export async function getLatestReadings(req, res, next) {
     const results = await Promise.all(
       plants.map(async (p) => {
         const idStr = p._id.toString();
-        return SensorReading.findOne({ plantId: idStr }).sort({ timestamp: -1 });
+        return SensorReading.findOne({ plantId: idStr, ...filter }).sort({ timestamp: -1 });
       })
     );
 
@@ -31,8 +33,9 @@ export async function getLatestReadings(req, res, next) {
 // GET /sensors/history
 export async function getSensorHistory(req, res, next) {
   try {
-    const { plantId, from, to, range, limit } = req.query;
-    const query = {};
+    const { plantId, from, to, range, limit, includeSimulated } = req.query;
+    const isSim = includeSimulated === 'true';
+    const query = isSim ? {} : { isSimulated: { $ne: true }, source: { $ne: 'simulated' } };
 
     if (plantId && plantId !== 'all') {
       query.plantId = plantId;

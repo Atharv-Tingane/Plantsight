@@ -81,8 +81,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      // Try the live backend. If any core call fails, fall back to demo data
-      // so the UI stays usable while the backend is wired up.
       const [plantsRes, alertsRes, analysesRes, profileRes, prefsRes, readingsRes] =
         await Promise.all([
           plantsService.list(),
@@ -100,13 +98,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setAllReadings(readingsRes);
       setIsDemoData(false);
     } catch (err) {
-      // Graceful fallback to demo data
-      loadDemo();
-      setError(err instanceof Error ? err.message : null);
+      // Set clean error state rather than silently displaying demo data
+      setError(err instanceof Error ? err.message : 'Failed to connect to PlantSight backend API');
+      setIsDemoData(false);
+      setPlants([]);
+      setAlerts([]);
+      setAnalyses([]);
+      setAllReadings([]);
     } finally {
       setLoading(false);
     }
-  }, [loadDemo]);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -257,7 +259,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const getReadingsForPlant = useCallback(
     (plantId: string) =>
       allReadings
-        .filter((r) => r.plantId === plantId)
+        .filter((r) => r.plantId === plantId && !r.isSimulated && r.source !== 'simulated')
         .sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp)),
     [allReadings]
   );
@@ -265,14 +267,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const latestReadings = useMemo(() => {
     const map: Record<string, SensorReading | undefined> = {};
     plants.forEach((p) => {
-      map[p.id] = isDemoData
-        ? latestReadingForPlant(p.id)
-        : allReadings
-            .filter((r) => r.plantId === p.id)
-            .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp))[0];
+      map[p.id] = allReadings
+        .filter((r) => r.plantId === p.id && !r.isSimulated && r.source !== 'simulated')
+        .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp))[0];
     });
     return map;
-  }, [plants, allReadings, isDemoData]);
+  }, [plants, allReadings]);
 
   const value: DataContextValue = {
     isDemoData,

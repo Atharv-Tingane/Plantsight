@@ -4,7 +4,7 @@ import { useData } from '@/context/DataContext';
 import { SensorChart } from '@/components/SensorChart';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, LoadingState } from '@/components/States';
-import { readingsToDateChartPoints } from '@/lib/chartData';
+import { readingsToDateChartPoints } from '@/utils/chartData';
 import type { SensorReading } from '@/types';
 
 type RangeKey = '24h' | '7d' | '30d' | 'all';
@@ -17,19 +17,23 @@ const rangeMs: Record<RangeKey, number> = {
 };
 
 export function SensorHistoryPage() {
-  const { plants, allReadings, isDemoData, loading, getReadingsForPlant } = useData();
+  const { plants, allReadings, loading, getReadingsForPlant } = useData();
   const [range, setRange] = useState<RangeKey>('7d');
   const [plantId, setPlantId] = useState<string>('all');
 
-  if (loading && allReadings.length === 0) return <LoadingState label="Loading sensor history…" />;
+  const realReadings = useMemo(
+    () => allReadings.filter((r) => !r.isSimulated && r.source !== 'simulated'),
+    [allReadings]
+  );
+
+  if (loading && realReadings.length === 0) return <LoadingState label="Loading sensor history…" />;
 
   const filtered = useMemo(() => {
     const now = Date.now();
     const cutoff = now - rangeMs[range];
-    return (plantId === 'all' ? allReadings : getReadingsForPlant(plantId)).filter(
-      (r) => +new Date(r.timestamp) >= cutoff
-    );
-  }, [allReadings, plantId, range, getReadingsForPlant]);
+    const sourceList = plantId === 'all' ? realReadings : getReadingsForPlant(plantId);
+    return sourceList.filter((r) => +new Date(r.timestamp) >= cutoff);
+  }, [realReadings, plantId, range, getReadingsForPlant]);
 
   const chartData = readingsToDateChartPoints(filtered);
   const avg = (key: keyof SensorReading) =>
@@ -87,11 +91,11 @@ export function SensorHistoryPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="card">
+        <div className="card p-6">
           <EmptyState
             icon={<Droplets className="w-6 h-6" />}
-            title="No readings in this range"
-            description="Try a wider date range or select a different plant."
+            title="No sensor data available"
+            description="No real sensor telemetry recorded yet. Connect an ESP32 sensor or POST to /api/sensors/reading."
           />
         </div>
       ) : (
@@ -107,7 +111,7 @@ export function SensorHistoryPage() {
           <div className="space-y-6">
             <SensorChart
               title="Soil moisture history"
-              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
+              isDemo={false}
               data={chartData}
               xKey="label"
               unit="%"
@@ -115,7 +119,7 @@ export function SensorHistoryPage() {
             />
             <SensorChart
               title="Temperature history"
-              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
+              isDemo={false}
               data={chartData}
               xKey="label"
               unit="°"
@@ -123,7 +127,7 @@ export function SensorHistoryPage() {
             />
             <SensorChart
               title="Humidity history"
-              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
+              isDemo={false}
               data={chartData}
               xKey="label"
               unit="%"
@@ -131,7 +135,7 @@ export function SensorHistoryPage() {
             />
             <SensorChart
               title="Light intensity history"
-              isDemo={isDemoData || filtered.some((r) => r.isSimulated)}
+              isDemo={false}
               data={chartData}
               xKey="label"
               unit="lx"

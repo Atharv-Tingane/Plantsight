@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Candidate models supporting multimodal generateContent on Gemini Developer API free tier
-const DEFAULT_MODELS = ['gemini-3.8-flash', 'gemini-flash-latest'];
+const DEFAULT_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-lite-latest'];
 
 /**
  * Sanitizes log messages to ensure API keys are never exposed in logs

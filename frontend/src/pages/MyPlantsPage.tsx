@@ -4,7 +4,7 @@ import { useData } from '@/context/DataContext';
 import { PlantCard } from '@/components/PlantCard';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, LoadingState } from '@/components/States';
-import { fileToDataUrl } from '@/lib/format';
+import { fileToDataUrl } from '@/utils/format';
 import type { Plant } from '@/types';
 
 const plantSpeciesSuggestions = [

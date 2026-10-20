@@ -2,12 +2,13 @@
   "name": "plantsight-backend",
   "version": "1.0.0",
   "description": "Backend API for PlantSight smart plant monitoring & AI diagnosis",
-  "main": "src/server.js",
+  "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "seed": "node src/scripts/seed.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node src/scripts/seed.js",
+    "test": "node src/scripts/testEndpoints.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",

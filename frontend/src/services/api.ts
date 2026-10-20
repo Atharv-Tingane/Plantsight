@@ -68,7 +68,7 @@ export const analysisService = {
       .get<AnalysisResult[]>('/analysis', { params: { plantId } })
       .then((r) => r.data),
   analyze: (payload: AnalyzeImagePayload) =>
-    apiClient.post<AnalysisResult>('/analysis/analyze', payload).then((r) => r.data),
+    apiClient.post<AnalysisResult>('/analysis/analyze', payload, { timeout: 60000 }).then((r) => r.data),
 };
 
 // ---------------------------------------------------------------------------

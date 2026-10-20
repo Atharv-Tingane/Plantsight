@@ -34,7 +34,7 @@ const navItems: NavItem[] = [
 export function AppLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { alerts, profile, isDemoData } = useData();
+  const { alerts, profile, isDemoData, error } = useData();
   const unackCount = alerts.filter((a) => !a.acknowledged).length;
 
   const pageTitle =
@@ -45,7 +45,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen lg:flex bg-[#f6f8f4]">
       {/* Sidebar — desktop */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-gray-100">
-        <SidebarContent unackCount={unackCount} />
+        <SidebarContent unackCount={unackCount} isDemoData={isDemoData} error={error} />
       </aside>
 
       {/* Sidebar — mobile drawer */}
@@ -63,7 +63,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             >
               <X className="w-5 h-5" />
             </button>
-            <SidebarContent unackCount={unackCount} onNavigate={() => setMobileOpen(false)} />
+            <SidebarContent unackCount={unackCount} isDemoData={isDemoData} error={error} onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}
@@ -129,9 +129,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
 function SidebarContent({
   unackCount,
+  isDemoData,
+  error,
   onNavigate,
 }: {
   unackCount: number;
+  isDemoData: boolean;
+  error: string | null;
   onNavigate?: () => void;
 }) {
   return (
@@ -171,12 +175,27 @@ function SidebarContent({
         ))}
       </nav>
       <div className="px-4 py-4 border-t border-gray-100">
-        <div className="rounded-xl bg-gradient-to-br from-brand-50 to-accent-50 p-4">
-          <p className="text-xs font-semibold text-brand-700">PlantSight v0.1</p>
-          <p className="text-[11px] text-gray-500 mt-1">
-            Connect your Node/Express/MongoDB backend via <code className="font-mono">VITE_API_BASE_URL</code>.
-          </p>
-        </div>
+        {!error && !isDemoData ? (
+          <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-brand-50 p-4 border border-emerald-100">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <p className="text-xs font-semibold text-emerald-800">Backend Connected</p>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1">
+              MongoDB Atlas &middot; Live API
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 p-4 border border-amber-200">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <p className="text-xs font-semibold text-amber-800">Backend Disconnected</p>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1">
+              Verify backend is running on port 5000.
+            </p>
+          </div>
+        )}
       </div>
     </>
   );

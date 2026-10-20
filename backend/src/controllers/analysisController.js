@@ -59,16 +59,16 @@ export async function runAnalysis(req, res, next) {
         }
       : null;
 
-    // 1. Upload image to Cloudinary (or local fallback)
-    const uploadedUrl = await uploadImage(image, 'plantsight/analyses');
-
-    // 2. Call Gemini for AI botanical diagnosis
-    const aiResult = await analyzePlantImage({
-      imageUrl: image, // pass full data URI or URL for vision prompt
-      plantName,
-      species,
-      sensorData,
-    });
+    // 1. Run Cloudinary upload and Gemini AI analysis in parallel for optimal response time
+    const [uploadedUrl, aiResult] = await Promise.all([
+      uploadImage(image, 'plantsight/analyses'),
+      analyzePlantImage({
+        imageUrl: image, // pass full data URI or URL for vision prompt
+        plantName,
+        species,
+        sensorData,
+      }),
+    ]);
 
     // 3. Persist Analysis result in MongoDB
     const analysisDoc = await Analysis.create({

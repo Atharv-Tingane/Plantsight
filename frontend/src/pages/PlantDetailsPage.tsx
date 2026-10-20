@@ -22,9 +22,8 @@ import { SensorCard } from '@/components/SensorCard';
 import { SensorChart } from '@/components/SensorChart';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, LoadingState, ErrorState } from '@/components/States';
-import { readingsToChartPoints } from '@/lib/chartData';
-import { healthStatusMeta, formatDateTime, timeAgo } from '@/lib/format';
-import { fileToDataUrl } from '@/lib/format';
+import { readingsToChartPoints } from '@/utils/chartData';
+import { healthStatusMeta, formatDateTime, timeAgo, fileToDataUrl } from '@/utils/format';
 
 export function PlantDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -161,41 +160,53 @@ export function PlantDetailsPage() {
       <h3 className="font-semibold text-gray-800 mb-3">Latest environmental readings</h3>
       {latest ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <SensorCard label="Soil moisture" value={latest.soilMoisture} unit="%" icon={Droplets} accent="blue" isDemo={isDemoData || Boolean(latest.isSimulated)} />
-          <SensorCard label="Temperature" value={latest.temperature} unit="°C" icon={Thermometer} accent="warning" isDemo={isDemoData || Boolean(latest.isSimulated)} />
-          <SensorCard label="Humidity" value={latest.humidity} unit="%" icon={Gauge} accent="accent" isDemo={isDemoData || Boolean(latest.isSimulated)} />
-          <SensorCard label="Light" value={latest.lightIntensity} unit="lux" icon={Sun} accent="brand" isDemo={isDemoData || Boolean(latest.isSimulated)} />
+          <SensorCard label="Soil moisture" value={latest.soilMoisture} unit="%" icon={Droplets} accent="blue" isDemo={false} />
+          <SensorCard label="Temperature" value={latest.temperature} unit="°C" icon={Thermometer} accent="warning" isDemo={false} />
+          <SensorCard label="Humidity" value={latest.humidity} unit="%" icon={Gauge} accent="accent" isDemo={false} />
+          <SensorCard label="Light" value={latest.lightIntensity} unit="lux" icon={Sun} accent="brand" isDemo={false} />
         </div>
       ) : (
         <div className="card mb-6">
-          <EmptyState icon={<Droplets className="w-6 h-6" />} title="No sensor readings yet" description="Connect a sensor or your backend to stream readings." />
+          <EmptyState icon={<Droplets className="w-6 h-6" />} title="No sensor readings yet" description="Connect an ESP32 sensor or send telemetry to stream readings." />
         </div>
       )}
 
       {/* Historical charts */}
       <div className="grid lg:grid-cols-2 gap-6 mb-6">
-        <SensorChart
-          title="Soil moisture & humidity history"
-          isDemo={isDemoData || readings.some((r) => r.isSimulated)}
-          data={chartData}
-          xKey="label"
-          height={220}
-          series={[
-            { key: 'soilMoisture', label: 'Soil (%)', color: '#0ea5e9' },
-            { key: 'humidity', label: 'Humidity (%)', color: '#5d8443' },
-          ]}
-        />
-        <SensorChart
-          title="Temperature & light history"
-          isDemo={isDemoData || readings.some((r) => r.isSimulated)}
-          data={chartData}
-          xKey="label"
-          height={220}
-          series={[
-            { key: 'temperature', label: 'Temp (°C)', color: '#f59e0b' },
-            { key: 'lightIntensity', label: 'Light (lux)', color: '#22621e' },
-          ]}
-        />
+        {readings.length > 0 ? (
+          <>
+            <SensorChart
+              title="Soil moisture & humidity history"
+              isDemo={false}
+              data={chartData}
+              xKey="label"
+              height={220}
+              series={[
+                { key: 'soilMoisture', label: 'Soil (%)', color: '#0ea5e9' },
+                { key: 'humidity', label: 'Humidity (%)', color: '#5d8443' },
+              ]}
+            />
+            <SensorChart
+              title="Temperature & light history"
+              isDemo={false}
+              data={chartData}
+              xKey="label"
+              height={220}
+              series={[
+                { key: 'temperature', label: 'Temp (°C)', color: '#f59e0b' },
+                { key: 'lightIntensity', label: 'Light (lux)', color: '#22621e' },
+              ]}
+            />
+          </>
+        ) : (
+          <div className="card p-6 lg:col-span-2">
+            <EmptyState
+              icon={<Droplets className="w-6 h-6" />}
+              title="No sensor telemetry for this plant"
+              description="Connect an ESP32 sensor to stream live readings for this plant."
+            />
+          </div>
+        )}
       </div>
 
       {/* Gallery */}

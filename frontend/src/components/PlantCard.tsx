@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Droplets, Thermometer, Activity } from 'lucide-react';
 import type { Plant, SensorReading } from '@/types';
-import { healthStatusMeta } from '@/lib/format';
+import { healthStatusMeta } from '@/utils/format';
 
 interface PlantCardProps {
   plant: Plant;

@@ -17,25 +17,46 @@ import { SensorChart } from '@/components/SensorChart';
 import { PlantCard } from '@/components/PlantCard';
 import { AlertRow } from '@/components/AlertRow';
 import { PageHeader } from '@/components/PageHeader';
-import { EmptyState, LoadingState } from '@/components/States';
-import { readingsToChartPoints } from '@/lib/chartData';
-import { healthStatusMeta, timeAgo } from '@/lib/format';
+import { EmptyState, LoadingState, ErrorState } from '@/components/States';
+import { readingsToChartPoints } from '@/utils/chartData';
+import { healthStatusMeta, timeAgo } from '@/utils/format';
 
 export function DashboardPage() {
-  const { plants, alerts, allReadings, latestReadings, isDemoData, loading, acknowledgeAlert } =
+  const { plants, alerts, allReadings, latestReadings, loading, error, refresh, acknowledgeAlert } =
     useData();
 
   if (loading && plants.length === 0) {
     return <LoadingState label="Loading your plants…" />;
   }
 
-  const chartData = readingsToChartPoints(
-    allReadings.filter((r) => r.plantId === plants[0]?.id).slice(-24)
-  );
+  if (error && plants.length === 0) {
+    return (
+      <div className="card p-6 my-6">
+        <ErrorState
+          title="Could not connect to PlantSight backend"
+          description={error}
+          action={
+            <button className="btn-primary" onClick={refresh}>
+              Retry connection
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
+  // Only use genuine sensor telemetry from hardware (exclude simulated/seed demo records)
+  const realReadings = allReadings.filter((r) => !r.isSimulated && r.source !== 'simulated');
+  const hasRealSensorData = realReadings.length > 0;
+
+  const realChartReadings = realReadings
+    .filter((r) => r.plantId === plants[0]?.id)
+    .slice(-24);
+  const chartData = readingsToChartPoints(realChartReadings);
 
   // Aggregate latest readings across all plants for top cards
-  const latest = allReadings.filter((r) => plants.some((p) => p.id === r.plantId));
-  const latestSorted = [...latest].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+  const latestReal = realReadings.filter((r) => plants.some((p) => p.id === r.plantId));
+  const latestSorted = [...latestReal].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
   const latestOverall = latestSorted[0];
   const previous = latestSorted[1];
 
@@ -68,69 +89,86 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <SensorCard
           label="Soil Moisture"
-          value={latestOverall?.soilMoisture ?? '—'}
-          unit="%"
+          value={hasRealSensorData && latestOverall?.soilMoisture !== undefined ? latestOverall.soilMoisture : '—'}
+          unit={hasRealSensorData ? '%' : undefined}
           icon={Droplets}
           accent="blue"
-          trend={delta('soilMoisture')}
-          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
-          sublabel="Average across plants"
+          trend={hasRealSensorData ? delta('soilMoisture') : undefined}
+          isDemo={false}
+          sublabel={hasRealSensorData ? 'Average across plants' : 'No sensor data available'}
         />
         <SensorCard
           label="Temperature"
-          value={latestOverall?.temperature ?? '—'}
-          unit="°C"
+          value={hasRealSensorData && latestOverall?.temperature !== undefined ? latestOverall.temperature : '—'}
+          unit={hasRealSensorData ? '°C' : undefined}
           icon={Thermometer}
           accent="warning"
-          trend={delta('temperature')}
-          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
-          sublabel="Ambient"
+          trend={hasRealSensorData ? delta('temperature') : undefined}
+          isDemo={false}
+          sublabel={hasRealSensorData ? 'Ambient' : 'No sensor data available'}
         />
         <SensorCard
           label="Humidity"
-          value={latestOverall?.humidity ?? '—'}
-          unit="%"
+          value={hasRealSensorData && latestOverall?.humidity !== undefined ? latestOverall.humidity : '—'}
+          unit={hasRealSensorData ? '%' : undefined}
           icon={Gauge}
           accent="accent"
-          trend={delta('humidity')}
-          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
-          sublabel="Ambient"
+          trend={hasRealSensorData ? delta('humidity') : undefined}
+          isDemo={false}
+          sublabel={hasRealSensorData ? 'Ambient' : 'No sensor data available'}
         />
         <SensorCard
           label="Light Intensity"
-          value={latestOverall?.lightIntensity ?? '—'}
-          unit="lux"
+          value={hasRealSensorData && latestOverall?.lightIntensity !== undefined ? latestOverall.lightIntensity : '—'}
+          unit={hasRealSensorData ? 'lux' : undefined}
           icon={Sun}
           accent="brand"
-          trend={delta('lightIntensity')}
-          isDemo={isDemoData || Boolean(latestOverall?.isSimulated)}
-          sublabel="Current"
+          trend={hasRealSensorData ? delta('lightIntensity') : undefined}
+          isDemo={false}
+          sublabel={hasRealSensorData ? 'Current' : 'No sensor data available'}
         />
       </div>
 
       {/* Charts + side column */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 space-y-6">
-          <SensorChart
-            title={`Sensor history · ${plants[0]?.name ?? ''}`}
-            isDemo={isDemoData || allReadings.some((r) => r.isSimulated)}
-            data={chartData}
-            xKey="label"
-            height={260}
-            series={[
-              { key: 'soilMoisture', label: 'Soil moisture (%)', color: '#0ea5e9' },
-              { key: 'humidity', label: 'Humidity (%)', color: '#5d8443' },
-            ]}
-          />
-          <SensorChart
-            title="Temperature trend"
-            isDemo={isDemoData || allReadings.some((r) => r.isSimulated)}
-            data={chartData}
-            xKey="label"
-            height={220}
-            unit="°"
-            series={[{ key: 'temperature', label: 'Temperature (°C)', color: '#f59e0b' }]}
-          />
+          {hasRealSensorData && chartData.length > 0 ? (
+            <>
+              <SensorChart
+                title={`Sensor history · ${plants[0]?.name ?? ''}`}
+                isDemo={false}
+                data={chartData}
+                xKey="label"
+                height={260}
+                series={[
+                  { key: 'soilMoisture', label: 'Soil moisture (%)', color: '#0ea5e9' },
+                  { key: 'humidity', label: 'Humidity (%)', color: '#5d8443' },
+                ]}
+              />
+              <SensorChart
+                title="Temperature trend"
+                isDemo={false}
+                data={chartData}
+                xKey="label"
+                height={220}
+                unit="°"
+                series={[{ key: 'temperature', label: 'Temperature (°C)', color: '#f59e0b' }]}
+              />
+            </>
+          ) : (
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-800">
+                  Sensor History {plants[0] ? `· ${plants[0].name}` : ''}
+                </h3>
+              </div>
+              <EmptyState
+                icon={<Droplets className="w-6 h-6" />}
+                title="No sensor data available"
+                description="Live telemetry will appear here once an ESP32 microcontroller or sensor device records data to the backend API."
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">

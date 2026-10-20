@@ -15,7 +15,7 @@ import {
 import { useData } from '@/context/DataContext';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, LoadingState } from '@/components/States';
-import { fileToDataUrl, formatDateTime, timeAgo } from '@/lib/format';
+import { fileToDataUrl, formatDateTime, timeAgo } from '@/utils/format';
 import type { AnalysisResult } from '@/types';
 
 export function AnalysisPage() {
@@ -45,7 +45,7 @@ export function AnalysisPage() {
   }
 
   async function handleAnalyze() {
-    if (!image || !plantId) return;
+    if (!image || !plantId || analyzing) return;
     const plant = plants.find((p) => p.id === plantId);
     if (!plant) return;
     setAnalyzing(true);
@@ -55,7 +55,12 @@ export function AnalysisPage() {
       const res = await runAnalysis(plantId, image, plant.name);
       setResult(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Analysis failed');
+      const msg = e instanceof Error ? e.message : 'Analysis failed';
+      if (msg.toLowerCase().includes('timeout')) {
+        setError('The AI botanical analysis took longer than expected. Please try again with a clear, well-lit photo.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setAnalyzing(false);
     }

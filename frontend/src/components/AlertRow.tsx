@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Bell, Check, Droplets, Thermometer, Sun, Leaf } from 'lucide-react';
 import type { AlertItem } from '@/types';
-import { severityMeta, timeAgo } from '@/lib/format';
+import { severityMeta, timeAgo } from '@/utils/format';
 
 const categoryIcon = {
   soil: Droplets,
