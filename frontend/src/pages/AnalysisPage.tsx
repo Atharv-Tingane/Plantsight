@@ -11,15 +11,17 @@ import {
   Info,
   Loader2,
   Leaf,
+  Sprout,
+  Plus,
 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { PageHeader } from '@/components/PageHeader';
-import { EmptyState, LoadingState } from '@/components/States';
+import { EmptyState, LoadingState, ErrorState } from '@/components/States';
 import { fileToDataUrl, formatDateTime, timeAgo } from '@/utils/format';
 import type { AnalysisResult } from '@/types';
 
 export function AnalysisPage() {
-  const { plants, analyses, runAnalysis, isDemoData } = useData();
+  const { plants, analyses, runAnalysis, loading, error: fetchError, refresh, isDemoData } = useData();
   const [searchParams] = useSearchParams();
   const [plantId, setPlantId] = useState(searchParams.get('plantId') ?? '');
   const [image, setImage] = useState<string | null>(null);
@@ -28,6 +30,11 @@ export function AnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+
+  // Always refresh plants on mount to ensure newly added plants are immediately available
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     if (!plantId && plants.length > 0) setPlantId(plants[0].id);
@@ -81,28 +88,54 @@ export function AnalysisPage() {
         subtitle="Capture or upload a photo to detect symptoms, possible diseases, and care recommendations."
       />
 
+      {fetchError && plants.length === 0 && (
+        <div className="card p-6 mb-6">
+          <ErrorState
+            title="Failed to load registered plants"
+            description={fetchError}
+            action={
+              <button className="btn-primary" onClick={refresh}>
+                Retry loading plants
+              </button>
+            }
+          />
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Capture / upload panel */}
         <div className="space-y-4">
           <div className="card p-5">
             <label htmlFor="analysis-plant" className="label">Select plant</label>
-            <select
-              id="analysis-plant"
-              className="input"
-              value={plantId}
-              onChange={(e) => setPlantId(e.target.value)}
-            >
-              {plants.length === 0 && <option value="">No plants available</option>}
-              {plants.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {p.species}
-                </option>
-              ))}
-            </select>
-            {plants.length === 0 && (
-              <p className="text-xs text-gray-400 mt-2">
-                <Link to="/plants" className="text-brand-700 hover:underline">Add a plant</Link> first to run an analysis.
-              </p>
+            {plants.length === 0 ? (
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 text-center">
+                <Sprout className="w-8 h-8 text-brand-600 mx-auto mb-2" />
+                <p className="text-sm font-medium text-gray-700">No plants registered yet</p>
+                <p className="text-xs text-gray-500 mt-1 mb-3">
+                  Please register a plant first before diagnosing it with AI.
+                </p>
+                <Link to="/plants" className="btn-primary inline-flex items-center gap-1.5 text-xs py-1.5 px-3">
+                  <Plus className="w-3.5 h-3.5" /> Register a plant in My Plants
+                </Link>
+              </div>
+            ) : (
+              <>
+                <select
+                  id="analysis-plant"
+                  className="input"
+                  value={plantId}
+                  onChange={(e) => setPlantId(e.target.value)}
+                >
+                  {plants.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.species ? `(${p.species})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-2">
+                  {plants.length} plant{plants.length === 1 ? '' : 's'} loaded from MongoDB Atlas.
+                </p>
+              </>
             )}
           </div>
 
@@ -163,7 +196,7 @@ export function AnalysisPage() {
 
             <button
               onClick={handleAnalyze}
-              disabled={!image || !plantId || analyzing}
+              disabled={!image || !plantId || analyzing || plants.length === 0}
               className="btn-primary w-full mt-4"
             >
               {analyzing ? (
