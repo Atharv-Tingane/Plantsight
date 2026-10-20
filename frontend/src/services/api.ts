@@ -7,7 +7,25 @@ import type {
   GalleryImage,
   UserProfile,
   MonitoringPreferences,
+  User,
+  AuthResponse,
+  LoginCredentials,
+  SignupCredentials,
 } from '@/types';
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+export const authService = {
+  signup: (payload: SignupCredentials) =>
+    apiClient.post<AuthResponse>('/auth/signup', payload).then((r) => r.data),
+  login: (payload: LoginCredentials) =>
+    apiClient.post<AuthResponse>('/auth/login', payload).then((r) => r.data),
+  me: () =>
+    apiClient.get<{ status: string; user: User }>('/auth/me').then((r) => r.data.user),
+  updateProfile: (payload: Partial<User>) =>
+    apiClient.put<{ status: string; user: User }>('/auth/profile', payload).then((r) => r.data.user),
+};
 
 // ---------------------------------------------------------------------------
 // Plants

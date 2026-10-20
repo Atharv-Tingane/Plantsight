@@ -36,6 +36,11 @@ const plantSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
     addedAt: {
       type: Date,
       default: Date.now,

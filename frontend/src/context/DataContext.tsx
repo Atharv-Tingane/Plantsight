@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from 'react';
 import { plantsService, sensorService, alertsService, analysisService, settingsService } from '@/services/api';
+import { useAuth } from './AuthContext';
 import {
   samplePlants,
   sampleSensorReadings,
@@ -55,6 +56,8 @@ interface DataContextValue {
 const DataContext = createContext<DataContextValue | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated, user, updateUser } = useAuth();
+
   const [isDemoData, setIsDemoData] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +68,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(sampleProfile);
   const [preferences, setPreferences] = useState<MonitoringPreferences>(samplePreferences);
   const [allReadings, setAllReadings] = useState<SensorReading[]>([]);
+
+  // Synchronize profile state when authenticated user changes
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl || sampleProfile.avatarUrl,
+        location: user.location || '',
+      });
+      if (user.preferences) {
+        setPreferences((prev) => ({ ...prev, ...user.preferences }));
+      }
+    }
+  }, [user]);
 
   const loadDemo = useCallback(() => {
     setPlants(samplePlants);
@@ -111,8 +129,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (isAuthenticated) {
+      refresh();
+    } else {
+      setPlants([]);
+      setAlerts([]);
+      setAnalyses([]);
+      setAllReadings([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, refresh]);
 
   const addPlant = useCallback<DataContextValue['addPlant']>(
     async (payload) => {
@@ -229,16 +255,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback<DataContextValue['updateProfile']>(
     async (p) => {
       setProfile((prev) => ({ ...prev, ...p }));
+      updateUser(p);
       if (!isDemoData) {
         try {
           const updated = await settingsService.updateProfile(p);
           setProfile(updated);
+          updateUser(updated);
         } catch {
           // keep optimistic update
         }
       }
     },
-    [isDemoData]
+    [isDemoData, updateUser]
   );
 
   const updatePreferences = useCallback<DataContextValue['updatePreferences']>(

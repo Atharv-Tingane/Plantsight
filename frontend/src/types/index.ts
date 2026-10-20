@@ -71,6 +71,35 @@ export interface UserProfile {
   location?: string;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  location?: string;
+  preferences?: MonitoringPreferences;
+  createdAt?: string;
+}
+
+export interface AuthResponse {
+  status: 'success' | 'error';
+  message?: string;
+  token: string;
+  user: User;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface SignupCredentials {
+  name: string;
+  email: string;
+  password: string;
+  location?: string;
+}
+
 export interface MonitoringPreferences {
   lowSoilMoistureThreshold: number;
   highTemperatureThreshold: number;

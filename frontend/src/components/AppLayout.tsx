@@ -1,4 +1,4 @@
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, Outlet } from 'react-router-dom';
 import { ReactNode, useState } from 'react';
 import {
   LayoutDashboard,
@@ -11,8 +11,10 @@ import {
   Menu,
   X,
   Search,
+  LogOut,
 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
+import { useAuth } from '@/context/AuthContext';
 import { AlertBellBadge } from './AlertRow';
 
 interface NavItem {
@@ -31,10 +33,11 @@ const navItems: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
-export function AppLayout({ children }: { children: ReactNode }) {
+export function AppLayout({ children }: { children?: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { alerts, profile, isDemoData, error } = useData();
+  const { logout } = useAuth();
   const unackCount = alerts.filter((a) => !a.acknowledged).length;
 
   const pageTitle =
@@ -45,7 +48,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen lg:flex bg-[#f6f8f4]">
       {/* Sidebar — desktop */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-gray-100">
-        <SidebarContent unackCount={unackCount} isDemoData={isDemoData} error={error} />
+        <SidebarContent
+          unackCount={unackCount}
+          isDemoData={isDemoData}
+          error={error}
+          profile={profile}
+          onLogout={logout}
+        />
       </aside>
 
       {/* Sidebar — mobile drawer */}
@@ -63,7 +72,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
             >
               <X className="w-5 h-5" />
             </button>
-            <SidebarContent unackCount={unackCount} isDemoData={isDemoData} error={error} onNavigate={() => setMobileOpen(false)} />
+            <SidebarContent
+              unackCount={unackCount}
+              isDemoData={isDemoData}
+              error={error}
+              profile={profile}
+              onLogout={logout}
+              onNavigate={() => setMobileOpen(false)}
+            />
           </aside>
         </div>
       )}
@@ -104,23 +120,33 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <Bell className="w-5 h-5" />
                 <AlertBellBadge count={unackCount} />
               </Link>
-              <Link to="/settings" className="flex items-center gap-2 pl-2">
-                <img
-                  src={profile.avatarUrl}
-                  alt={profile.name}
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-100"
-                />
-                <div className="hidden sm:block leading-tight">
-                  <p className="text-sm font-medium text-gray-800">{profile.name}</p>
-                  <p className="text-xs text-gray-400">{profile.email}</p>
-                </div>
-              </Link>
+              <div className="flex items-center gap-1.5 pl-2 border-l border-gray-100">
+                <Link to="/settings" className="flex items-center gap-2 hover:opacity-85 transition">
+                  <img
+                    src={profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+                    alt={profile.name}
+                    className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-100"
+                  />
+                  <div className="hidden sm:block leading-tight text-left">
+                    <p className="text-sm font-medium text-gray-800">{profile.name}</p>
+                    <p className="text-xs text-gray-400">{profile.email}</p>
+                  </div>
+                </Link>
+                <button
+                  onClick={logout}
+                  title="Sign out of PlantSight"
+                  aria-label="Sign out"
+                  className="p-2 ml-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto">
-          {children}
+          {children || <Outlet />}
         </main>
       </div>
     </div>
@@ -131,11 +157,15 @@ function SidebarContent({
   unackCount,
   isDemoData,
   error,
+  profile,
+  onLogout,
   onNavigate,
 }: {
   unackCount: number;
   isDemoData: boolean;
   error: string | null;
+  profile: { name: string; email: string; avatarUrl?: string };
+  onLogout: () => void;
   onNavigate?: () => void;
 }) {
   return (
@@ -174,24 +204,52 @@ function SidebarContent({
           </NavLink>
         ))}
       </nav>
-      <div className="px-4 py-4 border-t border-gray-100">
+
+      {/* User profile & backend status at bottom of sidebar */}
+      <div className="p-3 border-t border-gray-100 space-y-2">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-gray-50/80 border border-gray-100">
+          <Link
+            to="/settings"
+            onClick={onNavigate}
+            className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-85 transition"
+          >
+            <img
+              src={profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+              alt={profile.name}
+              className="w-8 h-8 rounded-full object-cover ring-1 ring-brand-200 shrink-0"
+            />
+            <div className="truncate text-left">
+              <p className="text-xs font-semibold text-gray-800 truncate">{profile.name}</p>
+              <p className="text-[11px] text-gray-400 truncate">{profile.email}</p>
+            </div>
+          </Link>
+          <button
+            onClick={onLogout}
+            title="Sign out"
+            aria-label="Sign out"
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+
         {!error && !isDemoData ? (
-          <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-brand-50 p-4 border border-emerald-100">
+          <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-brand-50 p-3 border border-emerald-100">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <p className="text-xs font-semibold text-emerald-800">Backend Connected</p>
             </div>
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-[11px] text-gray-500 mt-0.5">
               MongoDB Atlas &middot; Live API
             </p>
           </div>
         ) : (
-          <div className="rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 p-4 border border-amber-200">
+          <div className="rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 p-3 border border-amber-200">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-500" />
               <p className="text-xs font-semibold text-amber-800">Backend Disconnected</p>
             </div>
-            <p className="text-[11px] text-gray-500 mt-1">
+            <p className="text-[11px] text-gray-500 mt-0.5">
               Verify backend is running on port 5000.
             </p>
           </div>

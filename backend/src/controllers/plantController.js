@@ -6,9 +6,14 @@ import { Analysis } from '../models/Analysis.js';
 import { uploadImage } from '../services/cloudinaryService.js';
 
 // GET /plants
-export async function listPlants(_req, res, next) {
+export async function listPlants(req, res, next) {
   try {
-    const plants = await Plant.find().sort({ createdAt: -1 });
+    // If authenticated, show user's plants plus any legacy unassigned starter plants
+    const query = req.user
+      ? { $or: [{ userId: req.user._id }, { userId: { $exists: false } }, { userId: null }] }
+      : { $or: [{ userId: { $exists: false } }, { userId: null }] };
+
+    const plants = await Plant.find(query).sort({ createdAt: -1 });
     res.json(plants);
   } catch (err) {
     next(err);
@@ -54,6 +59,7 @@ export async function createPlant(req, res, next) {
       notes: notes ? notes.trim() : undefined,
       healthStatus: 'healthy',
       healthScore: 88,
+      userId: req.user ? req.user._id : undefined,
     });
 
     res.status(201).json(plant);
@@ -66,6 +72,16 @@ export async function createPlant(req, res, next) {
 export async function updatePlant(req, res, next) {
   try {
     const { name, species, location, imageUrl, notes, healthStatus, healthScore } = req.body;
+
+    const existingPlant = await Plant.findById(req.params.id);
+    if (!existingPlant) {
+      return res.status(404).json({ status: 'error', message: 'Plant not found' });
+    }
+
+    // Check ownership if plant has an owner
+    if (existingPlant.userId && req.user && !existingPlant.userId.equals(req.user._id)) {
+      return res.status(403).json({ status: 'error', message: 'Not authorized to modify this plant.' });
+    }
 
     let finalImageUrl = imageUrl;
     if (imageUrl && imageUrl.startsWith('data:image/')) {
@@ -86,10 +102,6 @@ export async function updatePlant(req, res, next) {
       runValidators: true,
     });
 
-    if (!plant) {
-      return res.status(404).json({ status: 'error', message: 'Plant not found' });
-    }
-
     res.json(plant);
   } catch (err) {
     next(err);
@@ -99,6 +111,16 @@ export async function updatePlant(req, res, next) {
 // DELETE /plants/:id
 export async function deletePlant(req, res, next) {
   try {
+    const existingPlant = await Plant.findById(req.params.id);
+    if (!existingPlant) {
+      return res.status(404).json({ status: 'error', message: 'Plant not found' });
+    }
+
+    // Check ownership if plant has an owner
+    if (existingPlant.userId && req.user && !existingPlant.userId.equals(req.user._id)) {
+      return res.status(403).json({ status: 'error', message: 'Not authorized to delete this plant.' });
+    }
+
     const plant = await Plant.findByIdAndDelete(req.params.id);
     if (!plant) {
       return res.status(404).json({ status: 'error', message: 'Plant not found' });

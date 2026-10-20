@@ -1,19 +1,29 @@
 import axios, { AxiosInstance } from 'axios';
 
-// Base URL comes from the environment. Falls back to a sane default so the
-// frontend works standalone with demo data before the backend is connected.
+// Base URL comes from the environment.
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
-// Simple in-memory token holder. The backend can set this via login flow later.
-let authToken: string | null = null;
+const TOKEN_KEY = 'plantsight_token';
+
+// Read initial token from localStorage if present
+let authToken: string | null =
+  typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+
+export function getAuthToken(): string | null {
+  return authToken;
+}
 
 export function setAuthToken(token: string | null) {
   authToken = token;
-  if (token) {
-    apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
-  } else {
-    delete apiClient.defaults.headers.common.Authorization;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+      delete apiClient.defaults.headers.common.Authorization;
+    }
   }
 }
 
@@ -25,6 +35,11 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
+// Initialize header if initial token is present
+if (authToken) {
+  apiClient.defaults.headers.common.Authorization = `Bearer ${authToken}`;
+}
+
 apiClient.interceptors.request.use((config) => {
   if (authToken) {
     config.headers.Authorization = `Bearer ${authToken}`;
@@ -35,6 +50,14 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // If 401 Unauthorized occurs on an authenticated resource (not during login/signup attempt)
+    if (error?.response?.status === 401) {
+      const url = error.config?.url || '';
+      if (!url.includes('/auth/login') && !url.includes('/auth/signup')) {
+        setAuthToken(null);
+      }
+    }
+
     // Normalize errors so callers can read a clean message.
     const message =
       error?.response?.data?.message ||
@@ -46,6 +69,5 @@ apiClient.interceptors.response.use(
 
 export const api = {
   baseUrl: API_BASE_URL,
-  // Health check — useful when connecting a real backend.
   ping: () => apiClient.get('/health').then((r) => r.data),
 };

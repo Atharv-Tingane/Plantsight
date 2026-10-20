@@ -8,6 +8,7 @@ import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
 // Route imports
 import healthRoutes from './routes/healthRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import plantRoutes from './routes/plantRoutes.js';
 import sensorRoutes from './routes/sensorRoutes.js';
 import alertRoutes from './routes/alertRoutes.js';
@@ -51,6 +52,7 @@ app.use('/health', healthRoutes);
 app.use('/api/health', healthRoutes);
 
 // API Resource routes
+app.use('/api/auth', authRoutes);
 app.use('/api/plants', plantRoutes);
 app.use('/api/sensors', sensorRoutes);
 app.use('/api/alerts', alertRoutes);

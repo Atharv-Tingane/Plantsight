@@ -8,20 +8,21 @@ import {
   getPlantGallery,
   addPlantGalleryImage,
 } from '../controllers/plantController.js';
+import { protect, optionalAuth } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
 router.route('/')
-  .get(listPlants)
-  .post(createPlant);
+  .get(optionalAuth, listPlants)
+  .post(protect, createPlant);
 
 router.route('/:id')
-  .get(getPlant)
-  .put(updatePlant)
-  .delete(deletePlant);
+  .get(optionalAuth, getPlant)
+  .put(protect, updatePlant)
+  .delete(protect, deletePlant);
 
 router.route('/:id/gallery')
-  .get(getPlantGallery)
-  .post(addPlantGalleryImage);
+  .get(optionalAuth, getPlantGallery)
+  .post(protect, addPlantGalleryImage);
 
 export default router;
