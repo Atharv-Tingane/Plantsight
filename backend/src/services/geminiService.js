@@ -20,6 +20,59 @@ function sanitize(str) {
 }
 
 /**
+ * Formats calibrated telemetry context for Gemini, guarding against uncalibrated values
+ */
+function formatTelemetryContext(sensorData, sensorHistory) {
+  if (!sensorData) {
+    return 'Environmental Sensor Telemetry: No live sensor telemetry currently available.';
+  }
+
+  const lines = ['Real-time Environmental Telemetry (Live ESP32 Microcontroller):'];
+
+  // 1. Calibrated Ambient Temperature (DHT11)
+  if (sensorData.temperature !== undefined) {
+    let tLine = `- Ambient Temperature: ${sensorData.temperature}°C (Calibrated DHT11 sensor)`;
+    if (sensorHistory && sensorHistory.avgTemperature !== null) {
+      tLine += ` | Recent window: Avg ${sensorHistory.avgTemperature}°C (Range: ${sensorHistory.minTemperature}°C – ${sensorHistory.maxTemperature}°C across ${sensorHistory.count} readings)`;
+    }
+    lines.push(tLine);
+  }
+
+  // 2. Calibrated Ambient Relative Humidity (DHT11)
+  if (sensorData.humidity !== undefined) {
+    let hLine = `- Ambient Relative Humidity: ${sensorData.humidity}% (Calibrated DHT11 sensor)`;
+    if (sensorHistory && sensorHistory.avgHumidity !== null) {
+      hLine += ` | Recent window: Avg ${sensorHistory.avgHumidity}% (Range: ${sensorHistory.minHumidity}% – ${sensorHistory.maxHumidity}% across ${sensorHistory.count} readings)`;
+    }
+    lines.push(hLine);
+  }
+
+  // 3. Soil Moisture (Placeholder Protection: 0 is an uninstalled probe)
+  if (sensorData.soilMoisture === 0) {
+    lines.push('- Soil Moisture Sensor: UNINSTALLED / PLACEHOLDER (Hardware value 0 represents an uninstalled probe; DO NOT diagnose underwatering, dehydration, or drought based on this value).');
+  } else if (sensorData.soilMoisture !== undefined) {
+    lines.push(`- Soil Moisture: ${sensorData.soilMoisture}%`);
+  }
+
+  // 4. Light Sensor (Raw 12-bit ADC Protection: 4095 is max ADC, not lux)
+  if (sensorData.lightIntensity !== undefined) {
+    if (sensorData.lightIntensity >= 4000) {
+      lines.push(`- Ambient Illumination: Raw ADC ${sensorData.lightIntensity}/4095 (Uncalibrated analog photoresistor reading indicating bright daytime exposure, NOT calibrated lux).`);
+    } else {
+      lines.push(`- Ambient Illumination: Raw ADC ${sensorData.lightIntensity}/4095 (Uncalibrated analog photoresistor reading, NOT calibrated lux).`);
+    }
+  }
+
+  lines.push('');
+  lines.push('DIAGNOSTIC GUIDELINES FOR SENSORS:');
+  lines.push('- Correlate visible foliar symptoms with calibrated temperature and humidity (e.g., prolonged high humidity favoring fungal pathogens like powdery mildew, or heat stress scorch from sustained >30°C temperature).');
+  lines.push('- Disregard the 0% soil moisture placeholder; assess plant hydration strictly from visual leaf turgor and foliage appearance in the photo.');
+  lines.push('- Treat light intensity solely as qualitative ambient day/night exposure.');
+
+  return lines.join('\n');
+}
+
+/**
  * Analyzes a plant image along with sensor telemetry using Google Gemini.
  *
  * @param {Object} params
@@ -27,15 +80,16 @@ function sanitize(str) {
  * @param {string} params.plantName - Plant name
  * @param {string} params.species - Plant species (if known)
  * @param {Object} [params.sensorData] - Telemetry (soilMoisture, temperature, humidity, lightIntensity)
+ * @param {Object} [params.sensorHistory] - Telemetry summary (averages, min, max, count)
  * @returns {Promise<Object>} Formatted analysis result
  */
-export async function analyzePlantImage({ imageUrl, plantName, species, sensorData }) {
+export async function analyzePlantImage({ imageUrl, plantName, species, sensorData, sensorHistory }) {
   const apiKey = process.env.GEMINI_API_KEY;
   const isKeyConfigured = Boolean(apiKey && apiKey.trim() && !apiKey.includes('your_'));
 
   if (!isKeyConfigured) {
     console.log('[Gemini] GEMINI_API_KEY is not configured in backend/.env. Using rule-based botanical diagnostic.');
-    return generateSmartFallback({ plantName, species, sensorData });
+    return generateSmartFallback({ plantName, species, sensorData, sensorHistory });
   }
 
   // Build candidate models list: user configured model first, followed by verified defaults
@@ -47,13 +101,7 @@ export async function analyzePlantImage({ imageUrl, plantName, species, sensorDa
   // Prepare image part once
   const imagePart = await prepareImagePart(imageUrl);
 
-  const telemetryContext = sensorData
-    ? `Real-time sensor telemetry:
-- Soil Moisture: ${sensorData.soilMoisture !== undefined ? `${sensorData.soilMoisture}%` : 'N/A'}
-- Temperature: ${sensorData.temperature !== undefined ? `${sensorData.temperature}°C` : 'N/A'}
-- Humidity: ${sensorData.humidity !== undefined ? `${sensorData.humidity}%` : 'N/A'}
-- Light Intensity: ${sensorData.lightIntensity !== undefined ? `${sensorData.lightIntensity} lux` : 'N/A'}`
-    : 'Sensor telemetry: No current sensor readings available.';
+  const telemetryContext = formatTelemetryContext(sensorData, sensorHistory);
 
   const prompt = `You are a professional botanical and plant pathology expert assistant.
 Analyze this plant image for health issues, deficiencies, pests, or fungal/bacterial diseases.
@@ -101,7 +149,7 @@ Note:
 
       const result = await model.generateContent(parts);
       const responseText = result.response.text();
-      const parsed = parseGeminiResponse(responseText, { plantName, species, sensorData });
+      const parsed = parseGeminiResponse(responseText, { plantName, species, sensorData, sensorHistory });
       
       console.log(`[Gemini] Analysis successful with model '${modelName}'.`);
       return parsed;
@@ -114,7 +162,7 @@ Note:
 
   // All model attempts failed; log sanitized error and return structured fallback
   console.error('[Gemini] All Gemini model attempts failed:', sanitize(lastError?.message));
-  return generateSmartFallback({ plantName, species, sensorData });
+  return generateSmartFallback({ plantName, species, sensorData, sensorHistory });
 }
 
 /**
@@ -218,42 +266,49 @@ function parseGeminiResponse(text, context) {
  * Provides an intelligent botanical diagnostic based on plant species and sensor telemetry.
  * Cleanly provides real horticultural advice without raw API error strings.
  */
-function generateSmartFallback({ plantName, species, sensorData }) {
-  const moisture = sensorData?.soilMoisture ?? 45;
-  const temp = sensorData?.temperature ?? 24;
+function generateSmartFallback({ plantName, species, sensorData, sensorHistory }) {
+  const temp = sensorData?.temperature ?? 26;
+  const humidity = sensorData?.humidity ?? 50;
+  // Note: 0 is an uninstalled probe placeholder, not genuine 0% moisture
+  const moisture = sensorData?.soilMoisture !== undefined && sensorData.soilMoisture > 0
+    ? sensorData.soilMoisture
+    : null;
 
-  let diseaseName = 'Normal Leaf Appearance';
+  let diseaseName = 'Healthy Foliage / Normal Growth';
   let probability = 0.88;
   const symptoms = [];
   const recommendations = [];
 
-  if (moisture < 25) {
-    diseaseName = 'Underwatering / Moisture Stress';
-    probability = 0.76;
-    symptoms.push('Low soil moisture telemetry detected');
-    symptoms.push('Leaf tips show potential signs of moisture deficiency');
-    recommendations.push('Water thoroughly at root level until soil is evenly moist');
-    recommendations.push('Verify pot drainage and consider mulching if topsoil dries rapidly');
-  } else if (moisture > 75) {
-    diseaseName = 'Overwatering / Root Saturation Risk';
-    probability = 0.72;
-    symptoms.push('Soil moisture is elevated above recommended threshold');
-    symptoms.push('Monitor for lower leaf chlorosis or soft leaf texture');
-    recommendations.push('Allow top 3–5 cm of soil to dry before the next watering cycle');
-    recommendations.push('Ensure planter drainage holes are clear of obstruction');
-  } else if (temp > 33) {
+  if (temp > 32) {
     diseaseName = 'Heat Stress & Evaporative Strain';
-    probability = 0.69;
-    symptoms.push(`Ambient temperature measured at ${temp}°C`);
-    symptoms.push('Possible leaf curl or edge drying due to heat');
-    recommendations.push('Provide partial shade during peak sun hours or relocate away from direct heat');
-    recommendations.push('Increase air circulation and monitor ambient humidity');
+    probability = 0.72;
+    symptoms.push(`Elevated ambient temperature measured at ${temp}°C`);
+    if (sensorHistory?.maxTemperature) {
+      symptoms.push(`Peak temperature reached ${sensorHistory.maxTemperature}°C in recent window`);
+    }
+    symptoms.push('Potential for leaf margin drying or transpirational leaf curl under high heat');
+    recommendations.push('Provide partial shade during afternoon peak hours to minimize heat stress');
+    recommendations.push('Maintain consistent humidity around foliage to reduce evaporative strain');
+  } else if (humidity > 72) {
+    diseaseName = 'High Humidity & Fungal Risk Factor';
+    probability = 0.68;
+    symptoms.push(`Elevated ambient relative humidity measured at ${humidity}%`);
+    symptoms.push('Prolonged high humidity increases susceptibility to fungal foliar spots or powdery mildew');
+    recommendations.push('Ensure good ventilation and gentle airflow between foliage');
+    recommendations.push('Avoid wetting leaves during watering to discourage fungal spore germination');
+  } else if (moisture !== null && moisture < 25) {
+    diseaseName = 'Underwatering / Moisture Stress';
+    probability = 0.75;
+    symptoms.push(`Low calibrated soil moisture detected (${moisture}%)`);
+    symptoms.push('Foliage shows signs of moisture deficit');
+    recommendations.push('Water thoroughly at root level until soil is evenly hydrated');
+    recommendations.push('Verify container drainage and mulch topsoil if drying too quickly');
   } else {
-    symptoms.push('Foliage coloration and growth appear consistent with healthy development');
-    symptoms.push('Environmental sensors indicate balanced growing conditions');
+    symptoms.push('Foliage coloration and growth appear consistent with healthy botanical development');
+    symptoms.push(`Ambient climate (${temp}°C, ${humidity}% RH) is within comfortable growing ranges`);
     recommendations.push(`Maintain regular watering schedule suited for ${species || plantName || 'this plant'}`);
     recommendations.push('Inspect undersides of leaves weekly to prevent pest establishment');
-    recommendations.push('Ensure consistent indirect light to promote steady photosynthesis');
+    recommendations.push('Ensure bright, indirect illumination to promote steady photosynthesis');
   }
 
   return {
@@ -262,7 +317,7 @@ function generateSmartFallback({ plantName, species, sensorData }) {
       {
         name: diseaseName,
         probability,
-        alternativeCauses: ['Natural leaf maturation', 'Minor nutrient fluctuation'],
+        alternativeCauses: ['Natural leaf maturation', 'Minor environmental adaptation'],
       },
     ],
     recommendations,

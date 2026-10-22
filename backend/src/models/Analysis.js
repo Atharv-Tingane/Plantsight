@@ -43,6 +43,9 @@ const analysisSchema = new mongoose.Schema(
       temperature: Number,
       humidity: Number,
       lightIntensity: Number,
+      avgTemperature: Number,
+      avgHumidity: Number,
+      readingCount: Number,
     },
     createdAt: {
       type: Date,

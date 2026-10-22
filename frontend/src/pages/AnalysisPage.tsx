@@ -294,6 +294,24 @@ function AnalysisResultCard({ result }: { result: AnalysisResult }) {
         <span className="text-xs text-gray-400 ml-auto">{formatDateTime(result.createdAt)}</span>
       </div>
 
+      {result.sensorSnapshot?.temperature !== undefined && (
+        <div className="mb-4 p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-brand-50 border border-emerald-100/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-emerald-800 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>ESP32 Microclimate Correlated</span>
+          </div>
+          <div className="flex items-center gap-3 text-gray-600 font-medium">
+            <span>🌡️ {result.sensorSnapshot.temperature}°C</span>
+            <span>💧 {result.sensorSnapshot.humidity}% RH</span>
+            {result.sensorSnapshot.avgTemperature && (
+              <span className="text-gray-400 font-normal">
+                (Avg: {result.sensorSnapshot.avgTemperature}°C)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <Section title="Observed symptoms" icon={<Info className="w-4 h-4" />}>
         <ul className="space-y-1.5">
           {result.symptoms.map((s, i) => (

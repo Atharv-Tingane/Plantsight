@@ -62,6 +62,15 @@ export interface AnalysisResult {
   recommendations: string[];
   uncertainty: 'low' | 'medium' | 'high';
   confidence: number; // 0-1
+  sensorSnapshot?: {
+    soilMoisture?: number;
+    temperature?: number;
+    humidity?: number;
+    lightIntensity?: number;
+    avgTemperature?: number;
+    avgHumidity?: number;
+    readingCount?: number;
+  };
 }
 
 export interface UserProfile {

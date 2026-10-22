@@ -89,15 +89,17 @@ export async function recordReading(req, res, next) {
     // Support body or query params for flexible microcontrollers
     const data = req.method === 'GET' ? req.query : req.body;
     let { plantId, soilMoisture, temperature, humidity, lightIntensity, isSimulated, source } = data;
+    plantId = plantId || req.query?.plantId;
 
     if (!plantId) {
       // Use cached default plant ID if available to avoid redundant queries every 5 seconds
       if (cachedDefaultPlantId) {
         plantId = cachedDefaultPlantId;
       } else {
-        const firstPlant = await Plant.findOne().select('_id');
-        if (firstPlant) {
-          cachedDefaultPlantId = firstPlant._id.toString();
+        // Associate with the most recently registered active plant
+        const activePlant = await Plant.findOne().sort({ createdAt: -1 }).select('_id');
+        if (activePlant) {
+          cachedDefaultPlantId = activePlant._id.toString();
           plantId = cachedDefaultPlantId;
         } else {
           return res.status(400).json({

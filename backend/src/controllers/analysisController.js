@@ -48,16 +48,60 @@ export async function runAnalysis(req, res, next) {
     const plantName = plant ? plant.name : 'Unknown Plant';
     const species = plant ? plant.species : '';
 
-    // Fetch latest sensor readings for this plant to provide context to Gemini
-    const latestReading = await SensorReading.findOne({ plantId }).sort({ timestamp: -1 });
-    const sensorData = latestReading
-      ? {
-          soilMoisture: latestReading.soilMoisture,
-          temperature: latestReading.temperature,
-          humidity: latestReading.humidity,
-          lightIntensity: latestReading.lightIntensity,
-        }
-      : null;
+    // Fetch latest genuine sensor reading for this plant (with fallback to latest real reading if unassigned)
+    const realFilter = { isSimulated: { $ne: true }, source: { $ne: 'simulated' } };
+    let latestReading = await SensorReading.findOne({ plantId, ...realFilter }).sort({ timestamp: -1 });
+    if (!latestReading) {
+      latestReading = await SensorReading.findOne(realFilter).sort({ timestamp: -1 });
+    }
+
+    let sensorData = null;
+    let sensorHistory = null;
+
+    if (latestReading) {
+      sensorData = {
+        soilMoisture: latestReading.soilMoisture,
+        temperature: latestReading.temperature,
+        humidity: latestReading.humidity,
+        lightIntensity: latestReading.lightIntensity,
+      };
+
+      // Retrieve recent readings to compute microclimate averages and range
+      const historyQuery = {
+        plantId: latestReading.plantId,
+        ...realFilter,
+      };
+      const recentReadings = await SensorReading.find(historyQuery)
+        .sort({ timestamp: -1 })
+        .limit(20);
+
+      if (recentReadings.length > 0) {
+        const temps = recentReadings.map((r) => r.temperature).filter((t) => typeof t === 'number');
+        const humidities = recentReadings.map((r) => r.humidity).filter((h) => typeof h === 'number');
+
+        const avgTemp = temps.length
+          ? Math.round((temps.reduce((a, b) => a + b, 0) / temps.length) * 10) / 10
+          : null;
+        const minTemp = temps.length ? Math.min(...temps) : null;
+        const maxTemp = temps.length ? Math.max(...temps) : null;
+
+        const avgHum = humidities.length
+          ? Math.round((humidities.reduce((a, b) => a + b, 0) / humidities.length) * 10) / 10
+          : null;
+        const minHum = humidities.length ? Math.min(...humidities) : null;
+        const maxHum = humidities.length ? Math.max(...humidities) : null;
+
+        sensorHistory = {
+          count: recentReadings.length,
+          avgTemperature: avgTemp,
+          minTemperature: minTemp,
+          maxTemperature: maxTemp,
+          avgHumidity: avgHum,
+          minHumidity: minHum,
+          maxHumidity: maxHum,
+        };
+      }
+    }
 
     // 1. Run Cloudinary upload and Gemini AI analysis in parallel for optimal response time
     const [uploadedUrl, aiResult] = await Promise.all([
@@ -67,6 +111,7 @@ export async function runAnalysis(req, res, next) {
         plantName,
         species,
         sensorData,
+        sensorHistory,
       }),
     ]);
 
@@ -80,7 +125,14 @@ export async function runAnalysis(req, res, next) {
       recommendations: aiResult.recommendations,
       uncertainty: aiResult.uncertainty,
       confidence: aiResult.confidence,
-      sensorSnapshot: sensorData || undefined,
+      sensorSnapshot: sensorData
+        ? {
+            ...sensorData,
+            avgTemperature: sensorHistory?.avgTemperature,
+            avgHumidity: sensorHistory?.avgHumidity,
+            readingCount: sensorHistory?.count,
+          }
+        : undefined,
       createdAt: new Date(),
     });
 

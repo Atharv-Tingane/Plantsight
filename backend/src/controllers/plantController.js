@@ -4,6 +4,7 @@ import { SensorReading } from '../models/SensorReading.js';
 import { Alert } from '../models/Alert.js';
 import { Analysis } from '../models/Analysis.js';
 import { uploadImage } from '../services/cloudinaryService.js';
+import { invalidateDefaultPlantCache } from './sensorController.js';
 
 // GET /plants
 export async function listPlants(req, res, next) {
@@ -61,6 +62,8 @@ export async function createPlant(req, res, next) {
       healthScore: 88,
       userId: req.user ? req.user._id : undefined,
     });
+
+    invalidateDefaultPlantCache();
 
     res.status(201).json(plant);
   } catch (err) {
@@ -133,6 +136,8 @@ export async function deletePlant(req, res, next) {
       Analysis.deleteMany({ plantId: req.params.id }),
       GalleryImage.deleteMany({ plantId: req.params.id }),
     ]);
+
+    invalidateDefaultPlantCache();
 
     res.json({ status: 'success', message: `Plant '${plant.name}' removed successfully.` });
   } catch (err) {
