@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Alert } from '../models/Alert.js';
 import { Plant } from '../models/Plant.js';
 import { Settings } from '../models/Settings.js';
@@ -10,6 +11,9 @@ import { Settings } from '../models/Settings.js';
  */
 export async function evaluateReadingAlerts(reading) {
   try {
+    // If database connection is not active, skip evaluation
+    if (mongoose.connection.readyState !== 1) return;
+
     const { plantId, soilMoisture, temperature, humidity, lightIntensity } = reading;
 
     // Find plant

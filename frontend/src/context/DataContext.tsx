@@ -294,10 +294,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const latestReadings = useMemo(() => {
     const map: Record<string, SensorReading | undefined> = {};
+    const realSorted = allReadings
+      .filter((r) => !r.isSimulated && r.source !== 'simulated')
+      .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+
     plants.forEach((p) => {
-      map[p.id] = allReadings
-        .filter((r) => r.plantId === p.id && !r.isSimulated && r.source !== 'simulated')
-        .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp))[0];
+      const directMatch = realSorted.find((r) => r.plantId === p.id);
+      map[p.id] = directMatch || (plants.length === 1 ? realSorted[0] : undefined);
     });
     return map;
   }, [plants, allReadings]);

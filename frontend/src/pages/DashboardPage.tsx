@@ -49,19 +49,34 @@ export function DashboardPage() {
   const realReadings = allReadings.filter((r) => !r.isSimulated && r.source !== 'simulated');
   const hasRealSensorData = realReadings.length > 0;
 
-  const realChartReadings = realReadings
-    .filter((r) => r.plantId === plants[0]?.id)
-    .slice(-24);
-  const chartData = readingsToChartPoints(realChartReadings);
+  // Real readings sorted newest first
+  const realSorted = [...realReadings].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
 
-  // Aggregate latest readings across all plants for top cards
-  const latestReal = realReadings.filter((r) => plants.some((p) => p.id === r.plantId));
-  const latestSorted = [...latestReal].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-  const latestOverall = latestSorted[0];
-  const previous = latestSorted[1];
+  // Prioritize readings linked to user's registered plants; fall back to available real telemetry stream
+  const userPlantReadings = realSorted.filter((r) => plants.some((p) => p.id === r.plantId));
+  const activeReadings = userPlantReadings.length > 0 ? userPlantReadings : realSorted;
+
+  const latestOverall = activeReadings[0];
+  const previous = activeReadings[1];
 
   const delta = (key: 'soilMoisture' | 'temperature' | 'humidity' | 'lightIntensity') =>
     latestOverall && previous ? Number((Number(latestOverall[key]) - Number(previous[key])).toFixed(1)) : undefined;
+
+  // Resolve associated plant or fallback to primary plant
+  const associatedPlant = plants.find((p) => p.id === latestOverall?.plantId) ?? plants[0];
+
+  // Prioritize primary plant's readings if matching, otherwise display available active telemetry
+  const primaryPlantReadings = associatedPlant
+    ? activeReadings.filter((r) => r.plantId === associatedPlant.id).slice(0, 24)
+    : [];
+  const chartSourceReadings = primaryPlantReadings.length > 0
+    ? primaryPlantReadings
+    : activeReadings.slice(0, 24);
+
+  const chartData = readingsToChartPoints(chartSourceReadings);
+  const chartTitle = associatedPlant?.name
+    ? `Sensor history · ${associatedPlant.name}`
+    : 'Sensor history · Live Telemetry';
 
   const unackAlerts = alerts.filter((a) => !a.acknowledged).slice(0, 4);
   const recentImages = plants.slice(0, 4);
@@ -90,42 +105,46 @@ export function DashboardPage() {
         <SensorCard
           label="Soil Moisture"
           value={hasRealSensorData && latestOverall?.soilMoisture !== undefined ? latestOverall.soilMoisture : '—'}
-          unit={hasRealSensorData ? '%' : undefined}
+          unit={hasRealSensorData && latestOverall?.soilMoisture !== undefined ? '%' : undefined}
           icon={Droplets}
           accent="blue"
           trend={hasRealSensorData ? delta('soilMoisture') : undefined}
           isDemo={false}
-          sublabel={hasRealSensorData ? 'Average across plants' : 'No sensor data available'}
+          sublabel={
+            hasRealSensorData && latestOverall
+              ? associatedPlant?.name ? `${associatedPlant.name} reading` : 'Live sensor telemetry'
+              : 'No sensor data available'
+          }
         />
         <SensorCard
           label="Temperature"
           value={hasRealSensorData && latestOverall?.temperature !== undefined ? latestOverall.temperature : '—'}
-          unit={hasRealSensorData ? '°C' : undefined}
+          unit={hasRealSensorData && latestOverall?.temperature !== undefined ? '°C' : undefined}
           icon={Thermometer}
           accent="warning"
           trend={hasRealSensorData ? delta('temperature') : undefined}
           isDemo={false}
-          sublabel={hasRealSensorData ? 'Ambient' : 'No sensor data available'}
+          sublabel={hasRealSensorData && latestOverall ? 'Ambient' : 'No sensor data available'}
         />
         <SensorCard
           label="Humidity"
           value={hasRealSensorData && latestOverall?.humidity !== undefined ? latestOverall.humidity : '—'}
-          unit={hasRealSensorData ? '%' : undefined}
+          unit={hasRealSensorData && latestOverall?.humidity !== undefined ? '%' : undefined}
           icon={Gauge}
           accent="accent"
           trend={hasRealSensorData ? delta('humidity') : undefined}
           isDemo={false}
-          sublabel={hasRealSensorData ? 'Ambient' : 'No sensor data available'}
+          sublabel={hasRealSensorData && latestOverall ? 'Ambient' : 'No sensor data available'}
         />
         <SensorCard
           label="Light Intensity"
           value={hasRealSensorData && latestOverall?.lightIntensity !== undefined ? latestOverall.lightIntensity : '—'}
-          unit={hasRealSensorData ? 'lux' : undefined}
+          unit={hasRealSensorData && latestOverall?.lightIntensity !== undefined ? 'lux' : undefined}
           icon={Sun}
           accent="brand"
           trend={hasRealSensorData ? delta('lightIntensity') : undefined}
           isDemo={false}
-          sublabel={hasRealSensorData ? 'Current' : 'No sensor data available'}
+          sublabel={hasRealSensorData && latestOverall ? 'Current' : 'No sensor data available'}
         />
       </div>
 
@@ -135,7 +154,7 @@ export function DashboardPage() {
           {hasRealSensorData && chartData.length > 0 ? (
             <>
               <SensorChart
-                title={`Sensor history · ${plants[0]?.name ?? ''}`}
+                title={chartTitle}
                 isDemo={false}
                 data={chartData}
                 xKey="label"
@@ -159,7 +178,7 @@ export function DashboardPage() {
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-800">
-                  Sensor History {plants[0] ? `· ${plants[0].name}` : ''}
+                  Sensor History {associatedPlant?.name ? `· ${associatedPlant.name}` : ''}
                 </h3>
               </div>
               <EmptyState

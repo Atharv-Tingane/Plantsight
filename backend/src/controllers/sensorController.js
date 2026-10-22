@@ -1,6 +1,13 @@
+import mongoose from 'mongoose';
 import { SensorReading } from '../models/SensorReading.js';
 import { Plant } from '../models/Plant.js';
 import { evaluateReadingAlerts } from '../services/alertService.js';
+
+let cachedDefaultPlantId = null;
+
+export function invalidateDefaultPlantCache() {
+  cachedDefaultPlantId = null;
+}
 
 // GET /sensors/latest
 export async function getLatestReadings(req, res, next) {
@@ -71,20 +78,33 @@ export async function getSensorHistory(req, res, next) {
 // POST /sensors/reading (ESP32 ingestion endpoint)
 export async function recordReading(req, res, next) {
   try {
+    // Fail fast if database is disconnected rather than buffering commands
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        status: 'error',
+        message: 'Database connection is temporarily unavailable. Telemetry not stored.',
+      });
+    }
+
     // Support body or query params for flexible microcontrollers
     const data = req.method === 'GET' ? req.query : req.body;
     let { plantId, soilMoisture, temperature, humidity, lightIntensity, isSimulated, source } = data;
 
     if (!plantId) {
-      // If plantId not specified, associate with first registered plant
-      const firstPlant = await Plant.findOne();
-      if (firstPlant) {
-        plantId = firstPlant._id.toString();
+      // Use cached default plant ID if available to avoid redundant queries every 5 seconds
+      if (cachedDefaultPlantId) {
+        plantId = cachedDefaultPlantId;
       } else {
-        return res.status(400).json({
-          status: 'error',
-          message: 'No plants exist. Please create a plant first before recording telemetry.',
-        });
+        const firstPlant = await Plant.findOne().select('_id');
+        if (firstPlant) {
+          cachedDefaultPlantId = firstPlant._id.toString();
+          plantId = cachedDefaultPlantId;
+        } else {
+          return res.status(400).json({
+            status: 'error',
+            message: 'No plants exist. Please create a plant first before recording telemetry.',
+          });
+        }
       }
     }
 
