@@ -64,10 +64,18 @@ export async function getSensorHistory(req, res, next) {
       if (to) query.timestamp.$lte = new Date(to);
     }
 
-    const maxLimit = limit ? Math.min(Number(limit), 1000) : 500;
-    const readings = await SensorReading.find(query)
-      .sort({ timestamp: 1 })
-      .limit(maxLimit);
+    let readings;
+    if (limit) {
+      const parsedLimit = Math.min(Math.max(Number(limit), 1), 10000);
+      readings = await SensorReading.find(query)
+        .sort({ timestamp: -1 })
+        .limit(parsedLimit);
+      readings.reverse();
+    } else {
+      readings = await SensorReading.find(query)
+        .sort({ timestamp: 1 })
+        .limit(10000);
+    }
 
     res.json(readings);
   } catch (err) {

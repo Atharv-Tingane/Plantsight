@@ -47,6 +47,65 @@ export interface GalleryImage {
   capturedAt: string;
 }
 
+export interface PlantIdentification {
+  commonName: string;
+  scientificName?: string | null;
+  description?: string;
+  confidence: number; // 0-1
+  isIdentified: boolean;
+  notes?: string;
+}
+
+export interface PossibleCause {
+  cause: string;
+  probability: number; // 0-1
+  explanation: string;
+  alternativeCauses: string[];
+}
+
+export interface IdealEnvironment {
+  temperature?: {
+    min?: number | null;
+    max?: number | null;
+    description?: string;
+  };
+  humidity?: {
+    min?: number | null;
+    max?: number | null;
+    description?: string;
+  };
+  sunlight?: string;
+  watering?: string;
+  soil?: string;
+  indoorOutdoor?: string;
+  speciesRequirements?: string;
+}
+
+export interface EnvironmentalAssessmentMetric {
+  current?: number | null;
+  targetRange?: string;
+  status: 'optimal' | 'low' | 'high' | 'warning' | 'alert' | 'uncalibrated' | 'qualitative' | 'unknown';
+  isCalibrated?: boolean;
+  evaluation: string;
+}
+
+export interface EnvironmentalComparison {
+  hasSensorData: boolean;
+  sensorStatus: 'live' | 'stale' | 'unavailable' | 'uncalibrated';
+  timestamp?: string | null;
+  temperatureAssessment?: EnvironmentalAssessmentMetric;
+  humidityAssessment?: EnvironmentalAssessmentMetric;
+  soilMoistureAssessment?: EnvironmentalAssessmentMetric;
+  lightAssessment?: EnvironmentalAssessmentMetric;
+  parametersSummary: {
+    parameter: string;
+    currentValue: string;
+    targetValue: string;
+    status: 'optimal' | 'warning' | 'alert' | 'uncalibrated' | 'info';
+  }[];
+  practicalRecommendations: string[];
+}
+
 export interface AnalysisResult {
   id: string;
   plantId: string;
@@ -71,6 +130,16 @@ export interface AnalysisResult {
     avgHumidity?: number;
     readingCount?: number;
   };
+  // Enhanced Botanical & Diagnostic Fields
+  plantIdentification?: PlantIdentification;
+  healthStatus?: HealthStatus;
+  severity?: 'low' | 'moderate' | 'high';
+  detailedDiagnosis?: string;
+  possibleCauses?: PossibleCause[];
+  treatment?: string[];
+  followUpCare?: string[];
+  idealEnvironment?: IdealEnvironment;
+  environmentalComparison?: EnvironmentalComparison;
 }
 
 export interface UserProfile {

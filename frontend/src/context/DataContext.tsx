@@ -225,8 +225,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           imageUrl: image,
           createdAt: new Date().toISOString(),
           symptoms: [
-            'Leaf discoloration observed on sample image',
-            'Possible spot patterns on upper leaf surface',
+            'Localized leaf chlorosis and pale margins observed on mature foliage',
+            'Slight downward curling along terminal leaf tips',
           ],
           possibleDiseases: [
             {
@@ -237,10 +237,90 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ],
           recommendations: [
             'Inspect plant closely under natural light (demo result)',
-            'Remove visibly affected leaves',
+            'Remove visibly affected leaves to minimize fungal spread',
+            'Water at base without wetting foliage',
           ],
           uncertainty: 'medium',
-          confidence: 0.61,
+          confidence: 0.72,
+          plantIdentification: {
+            commonName: plantName || 'Cultivated Plant',
+            scientificName: 'Botanical specimen',
+            description: 'Domestic garden specimen examined under demo conditions.',
+            confidence: 0.85,
+            isIdentified: true,
+            notes: 'Identified from botanical profile in demo mode.',
+          },
+          healthStatus: 'warning',
+          severity: 'moderate',
+          detailedDiagnosis: 'Foliar inspection indicates mild chlorophyll degradation along outer leaf margins, possibly caused by microclimate humidity shifts or early fungal leaf spot.',
+          possibleCauses: [
+            {
+              cause: 'Early Fungal Leaf Spot (demo)',
+              probability: 0.61,
+              explanation: 'Elevated ambient moisture and stagnant microclimate create favorable conditions for spore germination.',
+              alternativeCauses: ['Watering deficit', 'Natural leaf senescence'],
+            },
+          ],
+          treatment: [
+            'Prune visibly affected leaves using sanitized shears.',
+            'Apply organic neem oil or mild bio-fungicide if spotting expands.',
+          ],
+          followUpCare: [
+            'Check leaf undersides every 4–5 days.',
+            'Ensure adequate spacing between adjacent plants for airflow.',
+          ],
+          idealEnvironment: {
+            temperature: { min: 18, max: 28, description: '18°C – 28°C recommended growing range' },
+            humidity: { min: 45, max: 65, description: '45% – 65% relative humidity' },
+            sunlight: 'Bright indirect sunlight, 6–8 hours daily',
+            watering: 'Water when top 2–3 cm of soil is dry to the touch',
+            soil: 'Well-draining, nutrient-rich potting loam',
+            indoorOutdoor: 'Suitable for indoor windowsill or sheltered outdoor patio',
+            speciesRequirements: 'Protect from direct cold drafts and radiator vents.',
+          },
+          environmentalComparison: {
+            hasSensorData: true,
+            sensorStatus: 'live',
+            timestamp: new Date().toISOString(),
+            temperatureAssessment: {
+              current: 24.5,
+              targetRange: '18°C – 28°C',
+              status: 'optimal',
+              isCalibrated: true,
+              evaluation: 'Current ambient temperature (24.5°C) is within the optimal range.',
+            },
+            humidityAssessment: {
+              current: 58,
+              targetRange: '45% – 65% RH',
+              status: 'optimal',
+              isCalibrated: true,
+              evaluation: 'Current relative humidity (58%) is well-balanced.',
+            },
+            soilMoistureAssessment: {
+              current: 0,
+              targetRange: 'Evenly moist soil',
+              status: 'uncalibrated',
+              isCalibrated: false,
+              evaluation: 'Hardware probe uncalibrated. Check hydration manually.',
+            },
+            lightAssessment: {
+              current: 2400,
+              targetRange: 'Bright indirect sunlight',
+              status: 'qualitative',
+              isCalibrated: false,
+              evaluation: 'Raw ADC reading indicates adequate ambient daytime illumination.',
+            },
+            parametersSummary: [
+              { parameter: 'Temperature', currentValue: '24.5°C', targetValue: '18°C – 28°C', status: 'optimal' },
+              { parameter: 'Relative Humidity', currentValue: '58% RH', targetValue: '45% – 65% RH', status: 'optimal' },
+              { parameter: 'Soil Moisture', currentValue: '0 (Uncalibrated)', targetValue: 'Evenly moist', status: 'uncalibrated' },
+              { parameter: 'Ambient Light', currentValue: 'Raw ADC 2400/4095', targetValue: 'Bright indirect', status: 'info' },
+            ],
+            practicalRecommendations: [
+              'Maintain current comfortable ambient temperature.',
+              'Check soil moisture by hand before scheduling next watering.',
+            ],
+          },
         };
         setAnalyses((prev) => [result, ...prev]);
         return result;

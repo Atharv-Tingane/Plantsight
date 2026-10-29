@@ -131,6 +131,10 @@ async function runTests() {
     console.log('   Top diagnosis:', analysisData.possibleDiseases?.[0]?.name);
     console.log('   Confidence:', analysisData.confidence);
     console.log('   Recommendations:', analysisData.recommendations?.length);
+    console.log('   Plant identification:', analysisData.plantIdentification?.commonName, analysisData.plantIdentification ? '✓ OK' : '✗ FAIL');
+    console.log('   Health status:', analysisData.healthStatus, analysisData.healthStatus ? '✓ OK' : '✗ FAIL');
+    console.log('   Ideal environment:', analysisData.idealEnvironment?.temperature?.description, analysisData.idealEnvironment ? '✓ OK' : '✗ FAIL');
+    console.log('   Environmental comparison:', analysisData.environmentalComparison?.hasSensorData !== undefined ? '✓ OK' : '✗ FAIL');
 
     // 11. Plant delete (clean up)
     console.log('\n11. Testing DELETE /plants/:id...');
