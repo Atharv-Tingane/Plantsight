@@ -367,7 +367,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const getReadingsForPlant = useCallback(
     (plantId: string) =>
       allReadings
-        .filter((r) => r.plantId === plantId && !r.isSimulated && r.source !== 'simulated')
+        .filter((r) => {
+          if (r.isSimulated || r.source === 'simulated') return false;
+          if (plantId === 'unassigned') return !r.plantId;
+          return r.plantId === plantId;
+        })
         .sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp)),
     [allReadings]
   );
@@ -380,10 +384,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     plants.forEach((p) => {
       const directMatch = realSorted.find((r) => r.plantId === p.id);
-      map[p.id] = directMatch || (plants.length === 1 ? realSorted[0] : undefined);
+      const fallback = preferences.activePlantId === p.id ? realSorted.find((r) => !r.plantId) : undefined;
+      map[p.id] = directMatch || fallback || (plants.length === 1 ? realSorted[0] : undefined);
     });
     return map;
-  }, [plants, allReadings]);
+  }, [plants, allReadings, preferences.activePlantId]);
 
   const value: DataContextValue = {
     isDemoData,

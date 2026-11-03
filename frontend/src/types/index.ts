@@ -186,4 +186,5 @@ export interface MonitoringPreferences {
   diseaseAlertsEnabled: boolean;
   emailNotifications: boolean;
   measurementUnit: 'metric' | 'imperial';
+  activePlantId?: string | null;
 }

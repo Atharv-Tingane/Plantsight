@@ -48,9 +48,9 @@ export function PlantCard({ plant, reading }: PlantCardProps) {
         <div className="mt-3 flex items-center gap-3 text-xs text-gray-500">
           {reading && (
             <>
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1" title="Soil moisture reading">
                 <Droplets className="w-3.5 h-3.5 text-sky-500" />
-                {reading.soilMoisture}%
+                {reading.soilMoisture}
               </span>
               <span className="inline-flex items-center gap-1">
                 <Thermometer className="w-3.5 h-3.5 text-orange-500" />

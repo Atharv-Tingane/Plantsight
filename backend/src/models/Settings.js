@@ -21,6 +21,7 @@ const settingsSchema = new mongoose.Schema(
       diseaseAlertsEnabled: { type: Boolean, default: true },
       emailNotifications: { type: Boolean, default: true },
       measurementUnit: { type: String, enum: ['metric', 'imperial'], default: 'metric' },
+      activePlantId: { type: String, default: null },
     },
   },
   {

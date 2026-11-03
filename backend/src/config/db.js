@@ -29,7 +29,7 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
     await connectDB();
-  }, 5000);
+  }, 3000);
 }
 
 export async function connectDB() {
@@ -43,8 +43,11 @@ export async function connectDB() {
   isConnecting = true;
   try {
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 8000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      minPoolSize: 2,
+      heartbeatFrequencyMS: 10000,
     });
     isConnecting = false;
     return conn;
@@ -55,4 +58,33 @@ export async function connectDB() {
     scheduleReconnect();
     return null;
   }
+}
+
+/**
+ * Ensures MongoDB is connected. If disconnected or in-progress, waits up to timeoutMs.
+ * @param {number} timeoutMs - Maximum ms to wait (default 4000)
+ * @returns {Promise<boolean>} - true if connected (readyState === 1)
+ */
+export async function ensureDBConnection(timeoutMs = 4000) {
+  if (mongoose.connection.readyState === 1) {
+    return true;
+  }
+
+  // If completely disconnected, trigger connection attempt immediately
+  if (mongoose.connection.readyState === 0 && !isConnecting) {
+    connectDB().catch(() => {});
+  }
+
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (mongoose.connection.readyState === 1) {
+      return true;
+    }
+    if (mongoose.connection.readyState === 0 && !isConnecting) {
+      connectDB().catch(() => {});
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  return mongoose.connection.readyState === 1;
 }

@@ -4,7 +4,8 @@ const sensorReadingSchema = new mongoose.Schema(
   {
     plantId: {
       type: String,
-      required: [true, 'plantId is required'],
+      required: false,
+      default: null,
       index: true,
     },
     soilMoisture: {

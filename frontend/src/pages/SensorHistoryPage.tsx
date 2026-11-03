@@ -71,6 +71,9 @@ export function SensorHistoryPage() {
             {plants.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
+            {realReadings.some((r) => !r.plantId) && (
+              <option value="unassigned">Live telemetry (unassigned)</option>
+            )}
           </select>
         </div>
 
@@ -102,7 +105,7 @@ export function SensorHistoryPage() {
         <>
           {/* Summary averages */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <SummaryTile label="Avg soil moisture" value={avg('soilMoisture')} unit="%" icon={Droplets} color="text-sky-600 bg-sky-50" />
+            <SummaryTile label="Avg soil moisture reading" value={avg('soilMoisture')} unit="" icon={Droplets} color="text-sky-600 bg-sky-50" />
             <SummaryTile label="Avg temperature" value={avg('temperature')} unit="°C" icon={Thermometer} color="text-orange-600 bg-orange-50" />
             <SummaryTile label="Avg humidity" value={avg('humidity')} unit="%" icon={Gauge} color="text-accent-600 bg-accent-50" />
             <SummaryTile label="Avg light" value={avg('lightIntensity')} unit="lux" icon={Sun} color="text-brand-600 bg-brand-50" />
@@ -114,8 +117,7 @@ export function SensorHistoryPage() {
               isDemo={false}
               data={chartData}
               xKey="label"
-              unit="%"
-              series={[{ key: 'soilMoisture', label: 'Soil moisture (%)', color: '#0ea5e9' }]}
+              series={[{ key: 'soilMoisture', label: 'Soil moisture reading', color: '#0ea5e9' }]}
             />
             <SensorChart
               title="Temperature history"
@@ -170,7 +172,7 @@ function SummaryTile({
         <p className="text-xs text-gray-500">{label}</p>
         <p className="text-lg font-display font-semibold text-gray-900 tabular-nums">
           {value !== null ? value : '—'}
-          {value !== null && <span className="ml-1 text-sm font-medium text-gray-400">{unit}</span>}
+          {value !== null && Boolean(unit) && <span className="ml-1 text-sm font-medium text-gray-400">{unit}</span>}
         </p>
       </div>
     </div>

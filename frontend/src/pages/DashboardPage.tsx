@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Droplets,
@@ -50,33 +51,198 @@ export function DashboardPage() {
   const hasRealSensorData = realReadings.length > 0;
 
   // Real readings sorted newest first
-  const realSorted = [...realReadings].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+  const realSorted = useMemo(
+    () => [...realReadings].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp)),
+    [realReadings]
+  );
 
   // Prioritize readings linked to user's registered plants; fall back to available real telemetry stream
-  const userPlantReadings = realSorted.filter((r) => plants.some((p) => p.id === r.plantId));
+  const userPlantReadings = useMemo(
+    () => realSorted.filter((r) => plants.some((p) => p.id === r.plantId)),
+    [realSorted, plants]
+  );
   const activeReadings = userPlantReadings.length > 0 ? userPlantReadings : realSorted;
 
-  const latestOverall = activeReadings[0];
-  const previous = activeReadings[1];
+  // Multi-plant aggregation without double counting: get latest reading per plant
+  const plantLatestList = useMemo(() => {
+    return plants
+      .map((p) => latestReadings[p.id] || realSorted.find((r) => r.plantId === p.id))
+      .filter((r): r is import('@/types').SensorReading => Boolean(r));
+  }, [plants, latestReadings, realSorted]);
 
-  const delta = (key: 'soilMoisture' | 'temperature' | 'humidity' | 'lightIntensity') =>
-    latestOverall && previous ? Number((Number(latestOverall[key]) - Number(previous[key])).toFixed(1)) : undefined;
+  const {
+    summarySoilMoisture,
+    summaryTemperature,
+    summaryHumidity,
+    summaryLightIntensity,
+    soilSublabel,
+    tempSublabel,
+    humSublabel,
+    lightSublabel,
+    deltaSoil,
+    deltaTemp,
+    deltaHum,
+    deltaLight,
+  } = useMemo(() => {
+    if (plantLatestList.length > 1) {
+      const count = plantLatestList.length;
+      const avgSoil = Math.round(
+        plantLatestList.reduce((sum, r) => sum + Number(r.soilMoisture), 0) / count
+      );
+      const avgTemp = Number(
+        (plantLatestList.reduce((sum, r) => sum + Number(r.temperature), 0) / count).toFixed(1)
+      );
+      const avgHum = Number(
+        (plantLatestList.reduce((sum, r) => sum + Number(r.humidity), 0) / count).toFixed(1)
+      );
+      const avgLight = Math.round(
+        plantLatestList.reduce((sum, r) => sum + Number(r.lightIntensity), 0) / count
+      );
 
-  // Resolve associated plant or fallback to primary plant
-  const associatedPlant = plants.find((p) => p.id === latestOverall?.plantId) ?? plants[0];
+      const aggregateSublabel = `Average across ${count} plants`;
+      return {
+        summarySoilMoisture: avgSoil,
+        summaryTemperature: avgTemp,
+        summaryHumidity: avgHum,
+        summaryLightIntensity: avgLight,
+        soilSublabel: aggregateSublabel,
+        tempSublabel: aggregateSublabel,
+        humSublabel: aggregateSublabel,
+        lightSublabel: aggregateSublabel,
+        deltaSoil: undefined,
+        deltaTemp: undefined,
+        deltaHum: undefined,
+        deltaLight: undefined,
+      };
+    }
 
-  // Prioritize primary plant's readings if matching, otherwise display available active telemetry
-  const primaryPlantReadings = associatedPlant
-    ? activeReadings.filter((r) => r.plantId === associatedPlant.id).slice(0, 24)
-    : [];
-  const chartSourceReadings = primaryPlantReadings.length > 0
-    ? primaryPlantReadings
-    : activeReadings.slice(0, 24);
+    if (plantLatestList.length === 1) {
+      const single = plantLatestList[0];
+      const p = plants.find((item) => item.id === single.plantId);
+      const plantName = p ? p.name : 'Plant';
 
-  const chartData = readingsToChartPoints(chartSourceReadings);
-  const chartTitle = associatedPlant?.name
-    ? `Sensor history · ${associatedPlant.name}`
-    : 'Sensor history · Live Telemetry';
+      const plantHistory = activeReadings.filter((r) => r.plantId === single.plantId);
+      let dSoil: number | undefined;
+      let dTemp: number | undefined;
+      let dHum: number | undefined;
+      let dLight: number | undefined;
+
+      if (plantHistory.length > 1) {
+        const prev = plantHistory[1];
+        dSoil = Number((Number(single.soilMoisture) - Number(prev.soilMoisture)).toFixed(1));
+        dTemp = Number((Number(single.temperature) - Number(prev.temperature)).toFixed(1));
+        dHum = Number((Number(single.humidity) - Number(prev.humidity)).toFixed(1));
+        dLight = Number((Number(single.lightIntensity) - Number(prev.lightIntensity)).toFixed(1));
+      }
+
+      return {
+        summarySoilMoisture: single.soilMoisture,
+        summaryTemperature: single.temperature,
+        summaryHumidity: single.humidity,
+        summaryLightIntensity: single.lightIntensity,
+        soilSublabel: `${plantName} · latest reading`,
+        tempSublabel: `${plantName} · ambient`,
+        humSublabel: `${plantName} · ambient`,
+        lightSublabel: `${plantName} · current`,
+        deltaSoil: dSoil,
+        deltaTemp: dTemp,
+        deltaHum: dHum,
+        deltaLight: dLight,
+      };
+    }
+
+    if (realSorted.length > 0) {
+      const unassigned = realSorted[0];
+      let dSoil: number | undefined;
+      let dTemp: number | undefined;
+      let dHum: number | undefined;
+      let dLight: number | undefined;
+
+      if (realSorted.length > 1) {
+        const prev = realSorted[1];
+        dSoil = Number((Number(unassigned.soilMoisture) - Number(prev.soilMoisture)).toFixed(1));
+        dTemp = Number((Number(unassigned.temperature) - Number(prev.temperature)).toFixed(1));
+        dHum = Number((Number(unassigned.humidity) - Number(prev.humidity)).toFixed(1));
+        dLight = Number((Number(unassigned.lightIntensity) - Number(prev.lightIntensity)).toFixed(1));
+      }
+
+      return {
+        summarySoilMoisture: unassigned.soilMoisture,
+        summaryTemperature: unassigned.temperature,
+        summaryHumidity: unassigned.humidity,
+        summaryLightIntensity: unassigned.lightIntensity,
+        soilSublabel: 'Live garden telemetry',
+        tempSublabel: 'Ambient',
+        humSublabel: 'Ambient',
+        lightSublabel: 'Current',
+        deltaSoil: dSoil,
+        deltaTemp: dTemp,
+        deltaHum: dHum,
+        deltaLight: dLight,
+      };
+    }
+
+    return {
+      summarySoilMoisture: '—',
+      summaryTemperature: '—',
+      summaryHumidity: '—',
+      summaryLightIntensity: '—',
+      soilSublabel: 'No sensor data available',
+      tempSublabel: 'No sensor data available',
+      humSublabel: 'No sensor data available',
+      lightSublabel: 'No sensor data available',
+      deltaSoil: undefined,
+      deltaTemp: undefined,
+      deltaHum: undefined,
+      deltaLight: undefined,
+    };
+  }, [plantLatestList, plants, activeReadings, realSorted]);
+
+  // Plant selector for sensor history chart
+  const [selectedPlantId, setSelectedPlantId] = useState<string>('all');
+
+  const chartSourceReadings = useMemo(() => {
+    if (selectedPlantId === 'all') {
+      return activeReadings.slice(0, 24);
+    }
+    return activeReadings.filter((r) => r.plantId === selectedPlantId).slice(0, 24);
+  }, [selectedPlantId, activeReadings]);
+
+  const chartData = useMemo(() => readingsToChartPoints(chartSourceReadings), [chartSourceReadings]);
+
+  const chartTitle = useMemo(() => {
+    if (selectedPlantId === 'all') {
+      return plants.length > 1
+        ? 'Sensor history · All plants'
+        : plants[0]?.name
+        ? `Sensor history · ${plants[0].name}`
+        : 'Sensor history · Live Telemetry';
+    }
+    const plant = plants.find((p) => p.id === selectedPlantId);
+    return plant ? `Sensor history · ${plant.name}` : 'Sensor history';
+  }, [selectedPlantId, plants]);
+
+  const plantSelector = plants.length > 0 ? (
+    <div className="flex items-center gap-2">
+      <label htmlFor="dashboard-plant-filter" className="text-xs text-gray-500 font-medium hidden sm:inline">
+        Plant:
+      </label>
+      <select
+        id="dashboard-plant-filter"
+        value={selectedPlantId}
+        onChange={(e) => setSelectedPlantId(e.target.value)}
+        aria-label="Filter sensor history by plant"
+        className="text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer shadow-sm"
+      >
+        <option value="all">All plants</option>
+        {plants.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  ) : null;
 
   const unackAlerts = alerts.filter((a) => !a.acknowledged).slice(0, 4);
   const recentImages = plants.slice(0, 4);
@@ -103,48 +269,44 @@ export function DashboardPage() {
       {/* Top summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <SensorCard
-          label="Soil Moisture"
-          value={hasRealSensorData && latestOverall?.soilMoisture !== undefined ? latestOverall.soilMoisture : '—'}
-          unit={hasRealSensorData && latestOverall?.soilMoisture !== undefined ? '%' : undefined}
+          label="Soil Moisture Reading"
+          value={summarySoilMoisture}
+          unit={undefined}
           icon={Droplets}
           accent="blue"
-          trend={hasRealSensorData ? delta('soilMoisture') : undefined}
+          trend={deltaSoil}
           isDemo={false}
-          sublabel={
-            hasRealSensorData && latestOverall
-              ? associatedPlant?.name ? `${associatedPlant.name} reading` : 'Live sensor telemetry'
-              : 'No sensor data available'
-          }
+          sublabel={soilSublabel}
         />
         <SensorCard
           label="Temperature"
-          value={hasRealSensorData && latestOverall?.temperature !== undefined ? latestOverall.temperature : '—'}
-          unit={hasRealSensorData && latestOverall?.temperature !== undefined ? '°C' : undefined}
+          value={summaryTemperature}
+          unit={summaryTemperature !== '—' ? '°C' : undefined}
           icon={Thermometer}
           accent="warning"
-          trend={hasRealSensorData ? delta('temperature') : undefined}
+          trend={deltaTemp}
           isDemo={false}
-          sublabel={hasRealSensorData && latestOverall ? 'Ambient' : 'No sensor data available'}
+          sublabel={tempSublabel}
         />
         <SensorCard
           label="Humidity"
-          value={hasRealSensorData && latestOverall?.humidity !== undefined ? latestOverall.humidity : '—'}
-          unit={hasRealSensorData && latestOverall?.humidity !== undefined ? '%' : undefined}
+          value={summaryHumidity}
+          unit={summaryHumidity !== '—' ? '%' : undefined}
           icon={Gauge}
           accent="accent"
-          trend={hasRealSensorData ? delta('humidity') : undefined}
+          trend={deltaHum}
           isDemo={false}
-          sublabel={hasRealSensorData && latestOverall ? 'Ambient' : 'No sensor data available'}
+          sublabel={humSublabel}
         />
         <SensorCard
           label="Light Intensity"
-          value={hasRealSensorData && latestOverall?.lightIntensity !== undefined ? latestOverall.lightIntensity : '—'}
-          unit={hasRealSensorData && latestOverall?.lightIntensity !== undefined ? 'lux' : undefined}
+          value={summaryLightIntensity}
+          unit={summaryLightIntensity !== '—' ? 'lux' : undefined}
           icon={Sun}
           accent="brand"
-          trend={hasRealSensorData ? delta('lightIntensity') : undefined}
+          trend={deltaLight}
           isDemo={false}
-          sublabel={hasRealSensorData && latestOverall ? 'Current' : 'No sensor data available'}
+          sublabel={lightSublabel}
         />
       </div>
 
@@ -159,8 +321,9 @@ export function DashboardPage() {
                 data={chartData}
                 xKey="label"
                 height={260}
+                action={plantSelector}
                 series={[
-                  { key: 'soilMoisture', label: 'Soil moisture (%)', color: '#0ea5e9' },
+                  { key: 'soilMoisture', label: 'Soil moisture reading', color: '#0ea5e9' },
                   { key: 'humidity', label: 'Humidity (%)', color: '#5d8443' },
                 ]}
               />
@@ -170,21 +333,24 @@ export function DashboardPage() {
                 data={chartData}
                 xKey="label"
                 height={220}
-                unit="°"
+                unit="°C"
                 series={[{ key: 'temperature', label: 'Temperature (°C)', color: '#f59e0b' }]}
               />
             </>
           ) : (
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-800">
-                  Sensor History {associatedPlant?.name ? `· ${associatedPlant.name}` : ''}
-                </h3>
+                <h3 className="font-semibold text-gray-800">{chartTitle}</h3>
+                {plantSelector}
               </div>
               <EmptyState
                 icon={<Droplets className="w-6 h-6" />}
                 title="No sensor data available"
-                description="Live telemetry will appear here once an ESP32 microcontroller or sensor device records data to the backend API."
+                description={
+                  selectedPlantId === 'all'
+                    ? 'Live telemetry will appear here once an ESP32 microcontroller or sensor device records data to the backend API.'
+                    : `No sensor telemetry recorded yet for ${plants.find((p) => p.id === selectedPlantId)?.name || 'this plant'}.`
+                }
               />
             </div>
           )}

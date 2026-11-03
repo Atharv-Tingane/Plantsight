@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 import { SensorReading } from '../models/SensorReading.js';
 import { Plant } from '../models/Plant.js';
+import { Settings } from '../models/Settings.js';
 import { evaluateReadingAlerts } from '../services/alertService.js';
+import { ensureDBConnection } from '../config/db.js';
 
 let cachedDefaultPlantId = null;
 
@@ -12,6 +14,7 @@ export function invalidateDefaultPlantCache() {
 // GET /sensors/latest
 export async function getLatestReadings(req, res, next) {
   try {
+    await ensureDBConnection(2000);
     const { plantId, includeSimulated } = req.query;
     const isSim = includeSimulated === 'true';
     const filter = isSim ? {} : { isSimulated: { $ne: true }, source: { $ne: 'simulated' } };
@@ -31,6 +34,16 @@ export async function getLatestReadings(req, res, next) {
     );
 
     const filtered = results.filter(Boolean);
+
+    // Also include latest unassigned telemetry if present
+    const latestUnassigned = await SensorReading.findOne({
+      plantId: { $in: [null, ''] },
+      ...filter,
+    }).sort({ timestamp: -1 });
+    if (latestUnassigned) {
+      filtered.push(latestUnassigned);
+    }
+
     res.json(filtered);
   } catch (err) {
     next(err);
@@ -40,6 +53,7 @@ export async function getLatestReadings(req, res, next) {
 // GET /sensors/history
 export async function getSensorHistory(req, res, next) {
   try {
+    await ensureDBConnection(2000);
     const { plantId, from, to, range, limit, includeSimulated } = req.query;
     const isSim = includeSimulated === 'true';
     const query = isSim ? {} : { isSimulated: { $ne: true }, source: { $ne: 'simulated' } };
@@ -86,8 +100,9 @@ export async function getSensorHistory(req, res, next) {
 // POST /sensors/reading (ESP32 ingestion endpoint)
 export async function recordReading(req, res, next) {
   try {
-    // Fail fast if database is disconnected rather than buffering commands
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure database connection is ready before writing telemetry
+    const isDbReady = await ensureDBConnection(4000);
+    if (!isDbReady) {
       return res.status(503).json({
         status: 'error',
         message: 'Database connection is temporarily unavailable. Telemetry not stored.',
@@ -99,22 +114,20 @@ export async function recordReading(req, res, next) {
     let { plantId, soilMoisture, temperature, humidity, lightIntensity, isSimulated, source } = data;
     plantId = plantId || req.query?.plantId;
 
+    if (plantId) {
+      plantId = String(plantId).trim();
+      if (!plantId || plantId === 'undefined' || plantId === 'null') {
+        plantId = null;
+      }
+    }
+
     if (!plantId) {
-      // Use cached default plant ID if available to avoid redundant queries every 5 seconds
-      if (cachedDefaultPlantId) {
-        plantId = cachedDefaultPlantId;
+      // Check if user has configured an active plant for incoming hardware telemetry
+      const settingsDoc = await Settings.findOne({ key: 'default' }).select('preferences.activePlantId');
+      if (settingsDoc?.preferences?.activePlantId) {
+        plantId = settingsDoc.preferences.activePlantId;
       } else {
-        // Associate with the most recently registered active plant
-        const activePlant = await Plant.findOne().sort({ createdAt: -1 }).select('_id');
-        if (activePlant) {
-          cachedDefaultPlantId = activePlant._id.toString();
-          plantId = cachedDefaultPlantId;
-        } else {
-          return res.status(400).json({
-            status: 'error',
-            message: 'No plants exist. Please create a plant first before recording telemetry.',
-          });
-        }
+        plantId = null;
       }
     }
 
@@ -128,7 +141,7 @@ export async function recordReading(req, res, next) {
     const isSim = Boolean(isSimulated === true || isSimulated === 'true');
 
     const reading = await SensorReading.create({
-      plantId: String(plantId),
+      plantId,
       soilMoisture: Number(soilMoisture),
       temperature: Number(temperature),
       humidity: Number(humidity),

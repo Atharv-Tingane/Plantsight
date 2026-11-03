@@ -6,7 +6,7 @@ import { LoadingState } from '@/components/States';
 import type { MonitoringPreferences, UserProfile } from '@/types';
 
 export function SettingsPage() {
-  const { profile, preferences, updateProfile, updatePreferences, isDemoData, loading } = useData();
+  const { plants, profile, preferences, updateProfile, updatePreferences, isDemoData, loading } = useData();
   const [profileForm, setProfileForm] = useState<UserProfile>(profile);
   const [prefForm, setPrefForm] = useState<MonitoringPreferences>(preferences);
   const [savedProfile, setSavedProfile] = useState(false);
@@ -117,12 +117,11 @@ export function SettingsPage() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="pref-soil" className="label">Low soil moisture alert (%)</label>
+            <label htmlFor="pref-soil" className="label">Low soil moisture alert threshold</label>
             <input
               id="pref-soil"
               type="number"
               min={0}
-              max={100}
               className="input"
               value={prefForm.lowSoilMoistureThreshold}
               onChange={(e) => setPrefForm({ ...prefForm, lowSoilMoistureThreshold: Number(e.target.value) })}
@@ -207,6 +206,33 @@ export function SettingsPage() {
           >
             <option value="metric">Metric (°C, cm)</option>
             <option value="imperial">Imperial (°F, in)</option>
+          </select>
+        </div>
+
+        <div className="mt-5">
+          <label htmlFor="pref-active-plant" className="label">
+            Active Hardware Sensor Plant (ESP32)
+          </label>
+          <p className="text-xs text-gray-500 mb-2">
+            Incoming telemetry sent from an ESP32 microcontroller without an explicit plant ID will automatically be linked to this plant.
+          </p>
+          <select
+            id="pref-active-plant"
+            className="input max-w-sm"
+            value={prefForm.activePlantId || ''}
+            onChange={(e) =>
+              setPrefForm({
+                ...prefForm,
+                activePlantId: e.target.value ? e.target.value : null,
+              })
+            }
+          >
+            <option value="">None (Keep unassigned as garden telemetry)</option>
+            {plants.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.species})
+              </option>
+            ))}
           </select>
         </div>
 

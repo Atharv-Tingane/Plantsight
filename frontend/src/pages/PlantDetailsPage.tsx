@@ -160,7 +160,7 @@ export function PlantDetailsPage() {
       <h3 className="font-semibold text-gray-800 mb-3">Latest environmental readings</h3>
       {latest ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <SensorCard label="Soil moisture" value={latest.soilMoisture} unit="%" icon={Droplets} accent="blue" isDemo={false} />
+          <SensorCard label="Soil moisture reading" value={latest.soilMoisture} icon={Droplets} accent="blue" isDemo={false} />
           <SensorCard label="Temperature" value={latest.temperature} unit="°C" icon={Thermometer} accent="warning" isDemo={false} />
           <SensorCard label="Humidity" value={latest.humidity} unit="%" icon={Gauge} accent="accent" isDemo={false} />
           <SensorCard label="Light" value={latest.lightIntensity} unit="lux" icon={Sun} accent="brand" isDemo={false} />
@@ -182,7 +182,7 @@ export function PlantDetailsPage() {
               xKey="label"
               height={220}
               series={[
-                { key: 'soilMoisture', label: 'Soil (%)', color: '#0ea5e9' },
+                { key: 'soilMoisture', label: 'Soil moisture reading', color: '#0ea5e9' },
                 { key: 'humidity', label: 'Humidity (%)', color: '#5d8443' },
               ]}
             />
